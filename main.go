@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -451,19 +452,19 @@ func ExtractArchive(archive io.Reader, dirname string) error {
 	return nil
 }
 
-func (c *Config) ConvertVMX2OVA(vmx, ova string) error {
-	const errFmt = "converting vmx to ova: %s\n" +
+func (c *Config) ConvertVMX(vmx, output string) error {
+	const errFmt = "converting vmx to output: %s\n" +
 		"-- BEGIN STDERR OUTPUT -- :\n%s\n-- END STDERR OUTPUT --\n"
 
 	// ignore stdout
 	var stderr bytes.Buffer
 
-	cmd := exec.Command("ovftool", vmx, ova)
+	cmd := exec.Command("ovftool", vmx, output)
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("ovftool: %s", err)
 	}
-	Debugf("converting vmx to ova with cmd: %s %s", cmd.Path, cmd.Args)
+	Debugf("converting vmx to output with cmd: %s %s", cmd.Path, cmd.Args)
 
 	// Wait for process exit or interupt
 	errCh := make(chan error, 1)
@@ -472,7 +473,7 @@ func (c *Config) ConvertVMX2OVA(vmx, ova string) error {
 	select {
 	case <-c.stop:
 		if cmd.Process != nil {
-			Debugf("recieved stop signall killing ovftool process")
+			Debugf("recieved stop signal killing ovftool process")
 			cmd.Process.Kill()
 		}
 		return ErrInterupt
@@ -482,6 +483,65 @@ func (c *Config) ConvertVMX2OVA(vmx, ova string) error {
 		}
 	}
 
+	return nil
+}
+
+func (c *Config) TemplatizeOVF(oldOvf, newOvf string) error {
+	Debugf("getting refs and disk from OVF: ", oldOvf)
+	refsRegex := regexp.MustCompile(`(?s)<References>.*</References>`)
+	diskRegex := regexp.MustCompile(`(?s)<DiskSection>.*</DiskSection>`)
+	ovfBytes, err := ioutil.ReadFile(oldOvf)
+	if err != nil {
+		return err
+	}
+	ovfTxt := string(ovfBytes)
+	refs := refsRegex.FindString(ovfTxt)
+	disk := diskRegex.FindString(ovfTxt)
+	if refs == "" {
+		return fmt.Errorf("could not read refs from OVF: %s", oldOvf)
+	}
+	if disk == "" {
+		return fmt.Errorf("could not read disk from OVF: %s", oldOvf)
+	}
+	Debugf("creating new OVF from template", newOvf)
+	if err := WriteOVFTemplate(refs, disk, newOvf); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Config) CreateOVA(ovf, vmdk, ova string) error {
+	w, err := os.OpenFile(ova, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	tr := tar.NewWriter(w)
+	Debugf("created OVA: %s", ova)
+
+	errorf := func(format string, a ...interface{}) error {
+		w.Close()
+		os.Remove(c.Stemcell)
+		return fmt.Errorf(format, a...)
+	}
+
+	Debugf("adding OVF file to OVA: %s", ovf)
+	if err := c.AddTarFile(tr, ovf); err != nil {
+		return errorf("creating OVA: %s", err)
+	}
+
+	Debugf("adding VMDK file to OVA: %s", vmdk)
+	if err := c.AddTarFile(tr, vmdk); err != nil {
+		return errorf("creating OVA: %s", err)
+	}
+
+	if err := tr.Close(); err != nil {
+		return errorf("creating OVA: %s", err)
+	}
+
+	if err := w.Close(); err != nil {
+		return errorf("creating OVA: %s", err)
+	}
+	w.Close()
 	return nil
 }
 
@@ -544,8 +604,20 @@ func (c *Config) CreateImage(vmdk string) error {
 		return err
 	}
 
+	ovfPath := filepath.Join(tmpdir, "image.ovf")
+	vmdkPath := filepath.Join(tmpdir, "image-disk1.vmdk")
+	if err := c.ConvertVMX(vmxPath, ovfPath); err != nil {
+		return err
+	}
+
+	os.MkdirAll(filepath.Join(tmpdir, "newovf"), os.ModePerm)
+	newOvfPath := filepath.Join(tmpdir, "newovf", "image.ovf")
+	if err := c.TemplatizeOVF(ovfPath, newOvfPath); err != nil {
+		return err
+	}
+
 	ovaPath := filepath.Join(tmpdir, "image.ova")
-	if err := c.ConvertVMX2OVA(vmxPath, ovaPath); err != nil {
+	if err := c.CreateOVA(newOvfPath, vmdkPath, ovaPath); err != nil {
 		return err
 	}
 

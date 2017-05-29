@@ -234,7 +234,6 @@ func TestCreateImage(t *testing.T) {
 		// expect the image ova to contain only the following file names
 		expectedNames := []string{
 			"image.ovf",
-			"image.mf",
 			"image-disk1.vmdk",
 		}
 
@@ -251,7 +250,7 @@ func TestCreateImage(t *testing.T) {
 			infos[fi.Name()] = fi
 		}
 
-		if len(names) != 3 {
+		if len(names) != 2 {
 			t.Errorf("CreateImage: expected image (%s) to contain 3 files, found: %d - %s",
 				imageDir, len(names), names)
 		}
