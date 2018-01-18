@@ -17,6 +17,12 @@ import (
 	"github.com/pivotal-cf-experimental/stembuild/ovftool"
 )
 
+func TestMain(m *testing.M) {
+	Init()
+	os.Exit(m.Run())
+}
+
+
 // Run this test first - no point continuing with ovftool!
 func TestOVFTool(t *testing.T) {
 	const format = "locating ovftool executable: %s\n\n" +
@@ -45,6 +51,61 @@ var versionTests = []struct {
 	{"1200.0.3-build.2", true},
 	{"1200.0.3-build.a", false},
 	{"1.2-build.1", true},
+}
+
+// stembuild apply-patch tests
+
+func validateCommand(command string) []error {
+	testArgs := strings.Split(command, " ")
+	os.Args = testArgs
+	ParseFlags()
+
+	return ValidateFlags()
+}
+
+// context: correct apply-patch invocation should parse correctly
+func TestApplyPatchValidArgs(t *testing.T){
+	cmd := "stembuild apply-patch testdata/fake-package.yml"
+
+	errs := validateCommand(cmd)
+
+	if len(errs) != 0 {
+		t.Errorf("expected no errors, but got errors: %s", errs)
+	}
+}
+
+// context: any command not called "apply-patch" fails parsing
+func TestApplyPatchWrongCommandName(t *testing.T){
+	cmd := "stembuild apply-patc testdata/fake-package.yml"
+
+	errs := validateCommand(cmd)
+
+	if len(errs) == 0 {
+		t.Errorf("expected errors, but got none", errs)
+	}
+}
+
+// context: any apply-patch command with an invalid filepath given
+func TestApplyPatchInValidFile(t *testing.T){
+	cmd := "stembuild apply-patch idontexist"
+
+	errs := validateCommand(cmd)
+
+	if len(errs) == 0 {
+		t.Errorf("expected errors, but got none", errs)
+	}
+}
+
+// context: an apply-patch command with a well formed yaml manifest
+//
+func TestApplyPatchValidManifest(t *testing.T){
+	cmd := "stembuild apply-patch testdata/fake-package.yml"
+
+	errs := validateCommand(cmd)
+
+	if len(errs) > 0 {
+		t.Errorf("expected no errors, but got some", errs)
+	}
 }
 
 func TestValidateVersion(t *testing.T) {
@@ -105,7 +166,6 @@ func TestMissingOutputDirectoryCreatesDirectory(t *testing.T) {
 	)
 	testArgs := strings.Split(testCommand, " ")
 	os.Args = testArgs
-	Init()
 	ParseFlags()
 
 	errs := ValidateFlags()

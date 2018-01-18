@@ -88,12 +88,7 @@ func Init() {
 		flag.PrintDefaults()
 	}
 
-	flag.StringVar(&VHDFile, "vhd", "", "VHD file to patch")
 	flag.StringVar(&VMDKFile, "vmdk", "", "VMDK file to create stemcell from")
-
-	flag.StringVar(&DeltaFile, "delta", "",
-		"Patch file that will be applied to the VHD")
-	flag.StringVar(&DeltaFile, "d", "", "Patch file (shorthand)")
 
 	flag.StringVar(&OSVersion, "os", DefaultOSVersion,
 		"OS version must be either 2012R2 or 2016")
@@ -126,6 +121,23 @@ func validFile(name string) error {
 	return nil
 }
 
+func validateOutputDirectory(outputDir string) error {
+	if OutputDir == "" {
+		return errors.New("missing required argument 'output'")
+	}
+	fi, err := os.Stat(OutputDir)
+	if err != nil && os.IsNotExist(err) {
+		if err = os.Mkdir(OutputDir, 0700); err != nil {
+			return err
+		}
+	} else if err != nil || fi == nil {
+		return fmt.Errorf("error opening output directory (%s): %s\n", OutputDir)
+	} else if !fi.IsDir() {
+		return fmt.Errorf("output argument (%s): is not a directory\n", OutputDir)
+	}
+	return nil
+}
+
 func ValidateFlags() []error {
 	Debugf("validating [vmdk] (%s) [vhd] (%s) and [delta] (%s) flags",
 		VMDKFile, VHDFile, DeltaFile)
@@ -133,6 +145,22 @@ func ValidateFlags() []error {
 	var errs []error
 	add := func(err error) {
 		errs = append(errs, err)
+	}
+
+	if n := len(flag.Args()); n == 1 {
+		add(errors.New("invalid number of arguments supplied"))
+		return errs
+	} else if n == 2 {
+		if flag.Args()[0] != "apply-patch" {
+			add(errors.New("invalid command name"))
+			return errs
+		} else {
+			if err := validFile(flag.Args()[1]); err != nil {
+				add(fmt.Errorf("invalid filepath: %s", err))
+				return errs
+			}
+			return nil
+		}
 	}
 
 	if VMDKFile != "" && VHDFile != "" {
@@ -170,18 +198,8 @@ func ValidateFlags() []error {
 	}
 
 	Debugf("validating output directory: %s", OutputDir)
-	if OutputDir == "" {
-		add(errors.New("missing required argument 'output'"))
-	}
-	fi, err := os.Stat(OutputDir)
-	if err != nil && os.IsNotExist(err) {
-		if err = os.Mkdir(OutputDir, 0700); err != nil {
-			add(err)
-		}
-	} else if err != nil || fi == nil {
-		add(fmt.Errorf("error opening output directory (%s): %s\n", OutputDir, err))
-	} else if !fi.IsDir() {
-		add(fmt.Errorf("output argument (%s): is not a directory\n", OutputDir))
+	if err := validateOutputDirectory(OutputDir); err != nil {
+		add(err)
 	}
 
 	Debugf("validating stemcell version string: %s", Version)
