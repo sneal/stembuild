@@ -8,18 +8,24 @@ import (
 )
 
 type StembuildOptions struct {
-	PatchFile string `yaml:"patch_file"`
-	OSVersion string `yaml:"os_version"`
-	OutputDir string `yaml:"output_dir"`
-	Version   string `yaml:"version"`
-	VHDFile   string `yaml:"vhd_file"`
-	VMDKFile  string `yaml:"vmdk_file"`
+	PatchFile         string         `yaml:"patch_file"`
+	PatchFileChecksum string `yaml:"patch_file_checksum"`
+	OSVersion         string         `yaml:"os_version"`
+	OutputDir         string         `yaml:"output_dir"`
+	Version           string         `yaml:"version"`
+	VHDFile           string         `yaml:"vhd_file"`
+	VHDFileChecksum   string `yaml:"vhd_file_checksum"`
+	VMDKFile          string         `yaml:"vmdk_file"`
 }
 
 // Copy into `d` the values in `s` which are empty in `d`.
 func (d *StembuildOptions) CopyFrom(s StembuildOptions) {
 	if d.PatchFile == "" {
 		d.PatchFile = s.PatchFile
+	}
+
+	if d.PatchFileChecksum == "" {
+		d.PatchFileChecksum = s.PatchFileChecksum
 	}
 
 	if d.OSVersion == "" {
@@ -34,6 +40,10 @@ func (d *StembuildOptions) CopyFrom(s StembuildOptions) {
 
 	if d.VHDFile == "" {
 		d.VHDFile = s.VHDFile
+	}
+
+	if d.VHDFileChecksum == "" {
+		d.VHDFileChecksum = s.VHDFileChecksum
 	}
 
 	if d.VMDKFile == "" {

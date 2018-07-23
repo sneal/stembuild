@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
@@ -16,6 +15,9 @@ import (
 
 	"github.com/pivotal-cf-experimental/stembuild/helpers"
 	"github.com/pivotal-cf-experimental/stembuild/stembuildoptions"
+	"crypto/md5"
+	"math/rand"
+	"encoding/hex"
 )
 
 const validManifestTemplate = helpers.ManifestTemplate
@@ -63,6 +65,16 @@ var _ = Describe("Apply Patch", func() {
 			manifestStruct.OSVersion = "2012R2"
 			osVersion = "2012R2"
 			stemcellFilename = fmt.Sprintf("bosh-stemcell-%s-vsphere-esxi-windows%s-go_agent.tgz", manifestStruct.Version, osVersion)
+
+			vhdContent, err := ioutil.ReadFile("testdata/original.vhd")
+			Expect(err).NotTo(HaveOccurred())
+			vhdChecksum := md5.Sum(vhdContent)
+			manifestStruct.VHDFileChecksum = hex.EncodeToString(vhdChecksum[:])
+
+			patchContent, err := ioutil.ReadFile("testdata/diff.patch")
+			Expect(err).NotTo(HaveOccurred())
+			patchChecksum := md5.Sum(patchContent)
+			manifestStruct.PatchFileChecksum = hex.EncodeToString(patchChecksum[:])
 		})
 
 		Context("stembuild when executed with a patchfile on disk", func() {
@@ -104,6 +116,22 @@ var _ = Describe("Apply Patch", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
+
+		Context("when the patch checksum is invalid", func() {
+			BeforeEach(func() {
+				invalidChecksum := make([]byte, md5.Size)
+				rand.Read(invalidChecksum)
+				manifestStruct.PatchFileChecksum = hex.EncodeToString(invalidChecksum)
+			})
+
+			It("displays an error", func(){
+				session := helpers.Stembuild("apply-patch", manifestFilename)
+				Eventually(session).Should(Exit(1))
+				Eventually(session.Err).Should(Say("Checksum does not match for patch file"))
+			})
+		})
+
+		Context("when the vhd checksum is invalid", func() {})
 
 		Context("when OS version is invalid", func() {
 			BeforeEach(func() {

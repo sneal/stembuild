@@ -151,7 +151,9 @@ func StringFromManifest(fileTemplate string, manifestStruct stembuildoptions.Ste
 const ManifestTemplate = `---
 version: "{{.Version}}"
 vhd_file: "{{.VHDFile}}"
+vhd_file_checksum: "{{.VHDFileChecksum}}"
 patch_file: "{{.PatchFile}}"
+patch_file_checksum: "{{.PatchFileChecksum}}"
 os_version: "{{.OSVersion}}"
 output_dir: "{{.OutputDir}}"
 `
