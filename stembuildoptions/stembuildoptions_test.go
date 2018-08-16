@@ -292,6 +292,95 @@ var _ = Describe("StembuildOptions", func() {
 			})
 		})
 
+		Context("VHDChecksum", func() {
+			Context("when src specifies an VHDChecksum and dest does not", func() {
+				BeforeEach(func() {
+					src.VHDChecksum = fmt.Sprintf("%d%d%d", rand.Intn(2000), rand.Intn(2000), rand.Intn(2000))
+				})
+
+				It("copies src.VHDChecksum into dest.VHDChecksum", func() {
+					Expect(dest.VHDChecksum).To(Equal(src.VHDChecksum))
+				})
+			})
+
+			Context("when src specifies a VHDChecksum and dest specifies a VHDChecksum", func() {
+				var expectedDestVHDChecksum string
+
+				BeforeEach(func() {
+					src.VHDChecksum = fmt.Sprintf("%d%d%d", rand.Intn(2000), rand.Intn(2000), rand.Intn(2000))
+					dest.VHDChecksum = fmt.Sprintf("%d%d%d", rand.Intn(2000), rand.Intn(2000), rand.Intn(2000))
+					expectedDestVHDChecksum = dest.VHDChecksum
+				})
+
+				It("retains dest.VHDChecksum's original value", func() {
+					Expect(dest.VHDChecksum).To(Equal(expectedDestVHDChecksum))
+				})
+			})
+
+			Context("when src does not specify a VHDChecksum and dest does not specify a VHDChecksum", func() {
+				It("should do nothing", func() {
+					Expect(dest.VHDChecksum).To(BeEmpty())
+				})
+			})
+
+			Context("when dest does specify a VHDChecksum and src does not specify a VHDChecksum", func() {
+				var expectedDestVHDChecksum string
+
+				BeforeEach(func() {
+					dest.VHDChecksum = fmt.Sprintf("orange%d.vmdk", rand.Intn(2000))
+					expectedDestVHDChecksum = dest.VHDChecksum
+				})
+				It("should do nothing", func() {
+					Expect(dest.VHDChecksum).To(Equal(expectedDestVHDChecksum))
+				})
+			})
+		})
+
+		Context("PatchFileChecksum", func() {
+			Context("when src specifies an PatchFileChecksum and dest does not", func() {
+				BeforeEach(func() {
+					src.PatchFileChecksum = fmt.Sprintf("%d%d%d", rand.Intn(2000), rand.Intn(2000), rand.Intn(2000))
+				})
+
+				It("copies src.PatchFileChecksum into dest.PatchFileChecksum", func() {
+					Expect(dest.PatchFileChecksum).To(Equal(src.PatchFileChecksum))
+				})
+			})
+
+			Context("when src specifies a PatchFileChecksum and dest specifies a PatchFileChecksum", func() {
+				var expectedDestPatchFileChecksum string
+
+				BeforeEach(func() {
+					src.PatchFileChecksum = fmt.Sprintf("%d%d%d", rand.Intn(2000), rand.Intn(2000), rand.Intn(2000))
+					dest.PatchFileChecksum = fmt.Sprintf("%d%d%d", rand.Intn(2000), rand.Intn(2000), rand.Intn(2000))
+					expectedDestPatchFileChecksum = dest.PatchFileChecksum
+				})
+
+				It("retains dest.PatchFileChecksum's original value", func() {
+					Expect(dest.PatchFileChecksum).To(Equal(expectedDestPatchFileChecksum))
+				})
+			})
+
+			Context("when src does not specify a PatchFileChecksum and dest does not specify a PatchFileChecksum", func() {
+				It("should do nothing", func() {
+					Expect(dest.PatchFileChecksum).To(BeEmpty())
+				})
+			})
+
+			Context("when dest does specify a PatchFileChecksum and src does not specify a PatchFileChecksum", func() {
+				var expectedDestPatchFileChecksum string
+
+				BeforeEach(func() {
+					dest.PatchFileChecksum = fmt.Sprintf("orange%d.vmdk", rand.Intn(2000))
+					expectedDestPatchFileChecksum = dest.PatchFileChecksum
+				})
+				It("should do nothing", func() {
+					Expect(dest.PatchFileChecksum).To(Equal(expectedDestPatchFileChecksum))
+				})
+			})
+		})
+
+
 		Context("Multiple fields", func() {
 			Context("when some fields are set in src and another, somewhat overlapping, set of fields is set in dest", func() {
 				BeforeEach(func() {
@@ -299,10 +388,13 @@ var _ = Describe("StembuildOptions", func() {
 					dest.Version = "do"
 					dest.VHDFile = "qwerty"
 					dest.VMDKFile = "not"
+					dest.PatchFileChecksum = "0978769"
 					src.PatchFile = "matter"
 					src.OSVersion = "the"
 					src.OutputDir = "bear"
 					src.VHDFile = "does"
+					src.VHDChecksum = "123645125867"
+					src.PatchFileChecksum = "4200183"
 				})
 
 				It("copies into dest only those fields which are empty in dest", func() {
@@ -313,6 +405,8 @@ var _ = Describe("StembuildOptions", func() {
 						Version:   "do",
 						VHDFile:   "qwerty",
 						VMDKFile:  "not",
+						VHDChecksum: "123645125867",
+						PatchFileChecksum: "0978769",
 					}
 					Expect(dest).To(Equal(expected))
 				})
@@ -365,7 +459,7 @@ var _ = Describe("StembuildOptions", func() {
 			Context("when the file can be read", func() {
 				Context("when the file is not proper YAML", func() {
 					BeforeEach(func() {
-						testFileName = filepath.Join("testdata", "invalid-yml.yml")
+						testFileName = filepath.Join("..", "testdata", "invalid-yml.yml")
 					})
 
 					It("throws a parsing error", func() {
@@ -384,10 +478,149 @@ var _ = Describe("StembuildOptions", func() {
 							PatchFile: "testdata/diff.patch",
 							Version:   "1200.0",
 							VHDFile:   "testdata/original.vhd",
+							VHDChecksum: "some-checksum",
+							PatchFileChecksum: "some-checksum2",
 						}
 						Expect(args).To(Equal(expected))
 					})
 				})
+			})
+		})
+	})
+
+	Context("validateChecksum", func(){
+		var (
+			options StembuildOptions
+			executeErr   error
+		)
+		JustBeforeEach(func() {
+			executeErr = options.ValidateChecksum()
+		})
+
+		BeforeEach(func() {
+			options = StembuildOptions{}
+		})
+
+		Context("VHDFile path exists and PatchFile path exists", func() {
+			Context("Real VHDChecksum matches expected VHDChecksum and real PatchFileChecksum matches expected PatchFileChecksum", func(){
+				BeforeEach(func() {
+					options.VHDFile = filepath.Join("..", "testdata", "valid-apply-patch.yml")
+					options.PatchFile = filepath.Join("..", "testdata", "diff.patch")
+					options.VHDChecksum = "246616016f66ad2275364be1a2f625758a963a497ea4d1a1103a1a840c3ef274"
+					options.PatchFileChecksum = "d802a5077d747a4ce36e7318b262714dd01be78b645acab30fc01a2131184b09"
+				})
+				It("does nothing", func() {
+					Expect(executeErr).NotTo(HaveOccurred())
+				})
+			})
+
+			Context("Real VHDChecksum matches expected VHDChecksum but real PatchFileChecksum does not match expected PatchFileChecksum", func(){
+				BeforeEach(func() {
+					options.VHDFile = filepath.Join("..", "testdata", "valid-apply-patch.yml")
+					options.PatchFile = filepath.Join("..", "testdata", "diff.patch")
+					options.VHDChecksum = "246616016f66ad2275364be1a2f625758a963a497ea4d1a1103a1a840c3ef274"
+					options.PatchFileChecksum = "some-checksum"
+				})
+				It ("throws an appropriate error", func() {
+					Expect(executeErr).To(HaveOccurred())
+				})
+			})
+
+			Context("Real VHDChecksum does not match expected VHDChecksum but real PatchFileChecksum does match expected PatchFileChecksum", func(){
+				BeforeEach(func() {
+					options.VHDFile = filepath.Join("..", "testdata", "valid-apply-patch.yml")
+					options.PatchFile = filepath.Join("..", "testdata", "diff.patch")
+					options.VHDChecksum = "some-checksum"
+					options.PatchFileChecksum = "d802a5077d747a4ce36e7318b262714dd01be78b645acab30fc01a2131184b09"
+				})
+				It ("throws an appropriate error", func() {
+					Expect(executeErr).To(HaveOccurred())
+				})
+
+			})
+
+			Context("Real VHDChecksum does not match expected VHDChecksum and real PatchFileChecksum does not match expected PatchFileChecksum", func(){
+				BeforeEach(func() {
+					options.VHDFile = filepath.Join("..", "testdata", "valid-apply-patch.yml")
+					options.PatchFile = filepath.Join("..", "testdata", "diff.patch")
+					options.VHDChecksum = "some-checksum"
+					options.PatchFileChecksum = "some-checksum"
+				})
+				It ("throws an appropriate error", func() {
+					Expect(executeErr).To(HaveOccurred())
+				})
+
+			})
+
+		})
+
+		Context("VHDFile path exists but PatchFile path does not exist", func(){
+			Context("Real VHDChecksum matches expected VHDChecksum", func(){
+				BeforeEach(func() {
+					options.VHDFile = filepath.Join("..", "testdata", "valid-apply-patch.yml")
+					options.PatchFile = "diff.patch"
+					options.VHDChecksum = "246616016f66ad2275364be1a2f625758a963a497ea4d1a1103a1a840c3ef274"
+					options.PatchFileChecksum = "some-checksum"
+				})
+
+				It ("throws an appropriate error", func() {
+					Expect(executeErr).To(HaveOccurred())
+				})
+
+			})
+
+			Context("Real VHDChecksum does not match expected VHDChecksum", func(){
+				BeforeEach(func() {
+					options.VHDFile = filepath.Join("..", "testdata", "valid-apply-patch.yml")
+					options.PatchFile = "diff.patch"
+					options.VHDChecksum = "some-checksum"
+					options.PatchFileChecksum = "some-checksum"
+				})
+
+				It ("throws an appropriate error", func() {
+					Expect(executeErr).To(HaveOccurred())
+				})
+			})
+		})
+
+		Context("VHDFile path does not exist but PatchFile path does exist", func(){
+			Context("Real PatchFileChecksum matches expected PatchFileChecksum", func(){
+				BeforeEach(func() {
+					options.VHDFile = "valid-apply-patch.yml"
+					options.PatchFile = filepath.Join("..", "testdata", "diff.patch")
+					options.VHDChecksum = "some-checksum"
+					options.PatchFileChecksum = "d802a5077d747a4ce36e7318b262714dd01be78b645acab30fc01a2131184b09"
+				})
+
+				It ("throws an appropriate error", func() {
+					Expect(executeErr).To(HaveOccurred())
+				})
+			})
+
+			Context("Real PatchFileChecksum does not match expected PatchFileChecksum", func(){
+				BeforeEach(func() {
+					options.VHDFile = "valid-apply-patch.yml"
+					options.PatchFile = filepath.Join("..", "testdata", "diff.patch")
+					options.VHDChecksum = "some-checksum"
+					options.PatchFileChecksum = "some-checksum"
+				})
+				It ("throws an appropriate error", func() {
+					Expect(executeErr).To(HaveOccurred())
+				})
+
+			})
+
+		})
+
+		Context("VHDFile path does not exist and PatchFile path does not exist", func(){
+			BeforeEach(func() {
+				options.VHDFile = "valid-apply-patch.yml"
+				options.PatchFile = "diff.patch"
+				options.VHDChecksum = "some-checksum"
+				options.PatchFileChecksum = "some-checksum"
+			})
+			It("throws an appropriate error", func() {
+				Expect(executeErr).To(HaveOccurred())
 			})
 		})
 	})

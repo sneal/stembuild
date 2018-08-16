@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
 	"github.com/pivotal-cf-experimental/stembuild/ovftool"
 	"github.com/pivotal-cf-experimental/stembuild/stembuildoptions"
 	"github.com/pivotal-cf-experimental/stembuild/stemcell"
