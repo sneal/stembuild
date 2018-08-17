@@ -23,6 +23,7 @@ import (
 var (
 	applyPatch stembuildoptions.StembuildOptions
 
+	errs        []error
 	EnableDebug bool
 	DebugColor  bool
 )
@@ -139,15 +140,12 @@ func validUrl(urlPath string) error {
 	return fmt.Errorf("%s is not a URL", urlPath)
 }
 
-func ValidateFlags() []error {
-	var (
-		errs              []error
-		patchManifestFile string
-	)
+func add(err error) {
+	errs = append(errs, err)
+}
 
-	add := func(err error) {
-		errs = append(errs, err)
-	}
+func ValidateFlags() []error {
+	var patchManifestFile string
 
 	argCount := flag.NArg()
 	switch {
@@ -155,10 +153,12 @@ func ValidateFlags() []error {
 		command := flag.Arg(0)
 		if command != "apply-patch" {
 			add(fmt.Errorf("Unrecognized command '%s'", command))
+			return errs
 		}
 		patchManifestFile = flag.Arg(1)
 	case argCount != 0:
 		add(errors.New("Invalid number of arguments"))
+		return errs
 	}
 
 	if patchManifestFile != "" {
@@ -167,16 +167,6 @@ func ValidateFlags() []error {
 			add(fmt.Errorf("invalid patch manifest file: %q", err))
 			return errs
 		}
-	}
-
-	if applyPatch.OutputDir == "" || applyPatch.OutputDir == "." {
-		wd, err := os.Getwd()
-		if err != nil {
-			add(fmt.Errorf("getting working directory: %s", err))
-			return errs
-		}
-		Debugf("setting output dir (%s) to working directory: %s", applyPatch.OutputDir, wd)
-		applyPatch.OutputDir = wd
 	}
 
 	Debugf("validating [vmdk] (%s) [vhd] (%s) and [patch] (%s) flags",
@@ -193,10 +183,40 @@ func ValidateFlags() []error {
 
 	// check for extra flags in vmdk commmand
 	Debugf("validating that no extra flags or arguments were provided")
-	if applyPatch.VMDKFile != "" && len(flag.Args()) > 0 {
-		add(fmt.Errorf("extra arguments: %s\n", strings.Join(flag.Args(), ", ")))
+	validateInputs()
+
+	Debugf("validating output directory: %s", applyPatch.OutputDir)
+	validateOutputDir()
+
+	Debugf("validating integrity of provided inputs")
+	validateChecksums()
+
+	Debugf("validating stemcell version string: %s", applyPatch.Version)
+	if err := utils.ValidateVersion(applyPatch.Version); err != nil {
+		add(err)
+		return errs
 	}
 
+	Debugf("validating OS version: %s", applyPatch.OSVersion)
+	switch applyPatch.OSVersion {
+	case "2012R2", "2016", "1803":
+		// Ok
+	default:
+		add(fmt.Errorf("OS version must be either 2012R2, 2016 or 1803 have: %s", applyPatch.OSVersion))
+		return errs
+	}
+
+	name := filepath.Join(applyPatch.OutputDir, stemcell.StemcellFilename(applyPatch.Version, applyPatch.OSVersion))
+	Debugf("validating that stemcell filename (%s) does not exist", name)
+	if _, err := os.Stat(name); !os.IsNotExist(err) {
+		add(fmt.Errorf("error with output file (%s): %v (file may already exist)", name, err))
+		return errs
+	}
+
+	return errs
+}
+
+func validateInputs() {
 	if applyPatch.VMDKFile != "" {
 		Debugf("validating VMDK file [vmdk]: %q", applyPatch.VMDKFile)
 		if err := validFile(applyPatch.VMDKFile); err != nil {
@@ -215,11 +235,18 @@ func ValidateFlags() []error {
 			add(fmt.Errorf("invalid [patch]: %s", err))
 		}
 	}
+}
 
-	Debugf("validating output directory: %s", applyPatch.OutputDir)
-	if applyPatch.OutputDir == "" {
-		add(errors.New("missing required argument 'output'"))
+func validateOutputDir() {
+	if applyPatch.OutputDir == "" || applyPatch.OutputDir == "." {
+		wd, err := os.Getwd()
+		if err != nil {
+			add(fmt.Errorf("getting working directory: %s", err))
+		}
+		Debugf("setting output dir (%s) to working directory: %s", applyPatch.OutputDir, wd)
+		applyPatch.OutputDir = wd
 	}
+
 	fi, err := os.Stat(applyPatch.OutputDir)
 	if err != nil && os.IsNotExist(err) {
 		if err = os.Mkdir(applyPatch.OutputDir, 0700); err != nil {
@@ -230,67 +257,41 @@ func ValidateFlags() []error {
 	} else if !fi.IsDir() {
 		add(fmt.Errorf("output argument (%s): is not a directory\n", applyPatch.OutputDir))
 	}
-
-	Debugf("validating stemcell version string: %s", applyPatch.Version)
-	if err := utils.ValidateVersion(applyPatch.Version); err != nil {
-		add(err)
-	}
-
-	Debugf("validating OS version: %s", applyPatch.OSVersion)
-	switch applyPatch.OSVersion {
-	case "2012R2", "2016", "1803":
-		// Ok
-	default:
-		add(fmt.Errorf("OS version must be either 2012R2, 2016 or 1803 have: %s", applyPatch.OSVersion))
-	}
-
-	name := filepath.Join(applyPatch.OutputDir, stemcell.StemcellFilename(applyPatch.Version, applyPatch.OSVersion))
-	Debugf("validating that stemcell filename (%s) does not exist", name)
-	if _, err := os.Stat(name); !os.IsNotExist(err) {
-		add(fmt.Errorf("error with output file (%s): %v (file may already exist)", name, err))
-	}
-
-	return errs
 }
 
-func ValidateChecksums() error {
+func validateChecksums() {
+
 	if applyPatch.VHDFileChecksum != "" {
-		hasher := sha256.New()
-
-		VHDFile, err := os.Open(applyPatch.VHDFile)
-		if err != nil {
-			return errors.New("the specified base VHD file cannot be opened")
-		}
-		defer VHDFile.Close()
-		if _, err := io.Copy(hasher, VHDFile); err != nil {
-			return errors.New("the specified base VHD file cannot be loaded")
-		}
-
-		actualVHDFileChecksum := hex.EncodeToString(hasher.Sum(nil))
-
-		if applyPatch.VHDFileChecksum != actualVHDFileChecksum {
-			return errors.New("the specified base VHD is different from the VHD expected by the diff bundle")
+		if validateChecksum(applyPatch.VHDFile, applyPatch.VHDFileChecksum) != nil {
+			add(errors.New("the specified base VHD is different from the VHD expected by the diff bundle"))
 		}
 	}
-
 	if applyPatch.PatchFileChecksum != "" && validFile(applyPatch.PatchFile) == nil {
-		hasher := sha256.New()
-
-		PatchFile, err := os.Open(applyPatch.PatchFile)
-		if err != nil {
-			return errors.New("the specified patch file cannot be opened")
-		}
-		defer PatchFile.Close()
-		if _, err := io.Copy(hasher, PatchFile); err != nil {
-			return errors.New("the specified patch file cannot be loaded")
-		}
-
-		actualPatchFileChecksum := hex.EncodeToString(hasher.Sum(nil))
-
-		if applyPatch.PatchFileChecksum != actualPatchFileChecksum {
-			return errors.New("the specified patch file is different from the patch file expected by the diff bundle")
+		if validateChecksum(applyPatch.PatchFile, applyPatch.PatchFileChecksum) != nil {
+			add(errors.New("the specified patch file is different from the patch file expected by the diff bundle"))
 		}
 	}
+}
+
+func validateChecksum(filename, expectedChecksum string) error {
+	hasher := sha256.New()
+
+	fileContents, err := os.Open(filename)
+	if err != nil {
+		return errors.New("the specified file cannot be opened")
+	}
+
+	defer fileContents.Close()
+	if _, err := io.Copy(hasher, fileContents); err != nil {
+		return errors.New("the specified file cannot be loaded")
+	}
+
+	actualChecksum := hex.EncodeToString(hasher.Sum(nil))
+
+	if expectedChecksum != actualChecksum {
+		return errors.New("the actual checksum does not match the expected checksum")
+	}
+
 	return nil
 }
 
@@ -364,15 +365,6 @@ func main() {
 		for _, e := range errs {
 			fmt.Fprintf(os.Stderr, "  %s\n", e)
 		}
-
-		fmt.Fprintln(os.Stderr, "\nfor usage: stembuild -h")
-		os.Exit(1)
-	}
-
-	if err := ValidateChecksums(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: invalid inputs")
-
-		fmt.Fprintf(os.Stderr, "  %s\n", err)
 
 		fmt.Fprintln(os.Stderr, "\nfor usage: stembuild -h")
 		os.Exit(1)
