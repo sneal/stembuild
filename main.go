@@ -1,9 +1,16 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/pivotal-cf-experimental/stembuild/ovftool"
+	"github.com/pivotal-cf-experimental/stembuild/stembuildoptions"
+	"github.com/pivotal-cf-experimental/stembuild/stemcell"
+	"github.com/pivotal-cf-experimental/stembuild/utils"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -11,10 +18,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"github.com/pivotal-cf-experimental/stembuild/ovftool"
-	"github.com/pivotal-cf-experimental/stembuild/stembuildoptions"
-	"github.com/pivotal-cf-experimental/stembuild/stemcell"
-	"github.com/pivotal-cf-experimental/stembuild/utils"
 )
 
 var (
@@ -250,6 +253,47 @@ func ValidateFlags() []error {
 	return errs
 }
 
+func ValidateChecksums() error {
+	if applyPatch.VHDFileChecksum != "" {
+		hasher := sha256.New()
+
+		VHDFile, err := os.Open(applyPatch.VHDFile)
+		if err != nil {
+			return errors.New("the specified base VHD file cannot be opened")
+		}
+		defer VHDFile.Close()
+		if _, err := io.Copy(hasher, VHDFile); err != nil {
+			return errors.New("the specified base VHD file cannot be loaded")
+		}
+
+		actualVHDFileChecksum := hex.EncodeToString(hasher.Sum(nil))
+
+		if applyPatch.VHDFileChecksum != actualVHDFileChecksum {
+			return errors.New("the specified base VHD is different from the VHD expected by the diff bundle")
+		}
+	}
+
+	if applyPatch.PatchFileChecksum != "" && validFile(applyPatch.PatchFile) == nil {
+		hasher := sha256.New()
+
+		PatchFile, err := os.Open(applyPatch.PatchFile)
+		if err != nil {
+			return errors.New("the specified patch file cannot be opened")
+		}
+		defer PatchFile.Close()
+		if _, err := io.Copy(hasher, PatchFile); err != nil {
+			return errors.New("the specified patch file cannot be loaded")
+		}
+
+		actualPatchFileChecksum := hex.EncodeToString(hasher.Sum(nil))
+
+		if applyPatch.PatchFileChecksum != actualPatchFileChecksum {
+			return errors.New("the specified patch file is different from the patch file expected by the diff bundle")
+		}
+	}
+	return nil
+}
+
 func ParseFlags() error {
 	flag.Parse()
 
@@ -320,6 +364,15 @@ func main() {
 		for _, e := range errs {
 			fmt.Fprintf(os.Stderr, "  %s\n", e)
 		}
+
+		fmt.Fprintln(os.Stderr, "\nfor usage: stembuild -h")
+		os.Exit(1)
+	}
+
+	if err := ValidateChecksums(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: invalid inputs")
+
+		fmt.Fprintf(os.Stderr, "  %s\n", err)
 
 		fmt.Fprintln(os.Stderr, "\nfor usage: stembuild -h")
 		os.Exit(1)
