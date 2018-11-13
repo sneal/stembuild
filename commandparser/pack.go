@@ -4,14 +4,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/google/subcommands"
 	"github.com/pivotal-cf-experimental/stembuild/colorlogger"
 	. "github.com/pivotal-cf-experimental/stembuild/pack/options"
 	"github.com/pivotal-cf-experimental/stembuild/pack/ovftool"
 	"github.com/pivotal-cf-experimental/stembuild/pack/stemcell"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 type PackageCmd struct {

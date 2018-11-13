@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/google/subcommands"
-	. "github.com/pivotal-cf-experimental/stembuild/commandparser"
 	"os"
 	"path"
+
+	"github.com/google/subcommands"
+	. "github.com/pivotal-cf-experimental/stembuild/commandparser"
 )
 
 func main() {
@@ -25,6 +26,10 @@ func main() {
 	packageCmd := PackageCmd{}
 	packageCmd.GlobalFlags = &gf
 	commander.Register(&packageCmd, "")
+
+	constructCmd := ConstructCmd{}
+	constructCmd.GlobalFlags = &gf
+	commander.Register(&constructCmd, "")
 
 	fs.Parse(os.Args[1:])
 	ctx := context.Background()
