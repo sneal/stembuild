@@ -44,6 +44,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	constructCmd := ConstructCmd{}
+	constructCmd.GlobalFlags = &gf
+	commander.Register(&constructCmd, "")
+
+	fs.Parse(os.Args[1:])
 	ctx := context.Background()
 	os.Exit(int(commander.Execute(ctx)))
 }
