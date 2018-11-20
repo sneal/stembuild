@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/masterzen/winrm"
 	"os"
 	"path/filepath"
 
@@ -84,6 +85,10 @@ func (p *ConstructCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interfac
 		return subcommands.ExitFailure
 		//TODO: Download LGPO
 	}
+
+	//TODO: TRANSFER ARTIFACTTS
+
+	RemoteExecuteAutomation(p.winrmUsername, p.winrmPassword, p.winrmIP, )
 
 	return subcommands.ExitSuccess
 }

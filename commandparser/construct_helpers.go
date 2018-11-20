@@ -18,3 +18,15 @@ func IsArtifactInDirectory(directory string, artifactFileName string) (bool, err
 	}
 	return true, nil
 }
+
+func RemoteExecuteAutomation(username string, password string, ip string) {
+	endpoint := winrm.NewEndpoint(ip, 5986, false, true, nil, nil, nil, 0)
+	client, err := winrm.NewClient(endpoint, username, password)
+	if err != nil {
+		panic(err)
+	}
+	client.Run("Expand-Archive C:\\Provisioners\\StemcellAutomation.zip", os.Stdout, os.Stderr)
+	client.Run("./Setup.ps1", os.Stdout, os.Stderr)
+}
+
+

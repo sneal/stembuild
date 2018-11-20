@@ -11,11 +11,69 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:96d5c4e62a948c75882439e8ae1e2bf28db813849724c15b1e88104c80b24e57"
+  name = "github.com/Azure/go-ntlmssp"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "4a21cbd618b459155f8b8ee7f4491cd54f5efa77"
+
+[[projects]]
+  digest = "1:3f05b2028e83bf1d97d9ab2874bfc9f12f91a2946019499f830db16a02eb2385"
+  name = "github.com/ChrisTrenkamp/goxpath"
+  packages = [
+    ".",
+    "internal/execxp",
+    "internal/lexer",
+    "internal/parser",
+    "internal/parser/findutil",
+    "internal/parser/intfns",
+    "internal/parser/pathexpr",
+    "internal/xconst",
+    "internal/xsort",
+    "tree",
+    "tree/xmltree",
+    "tree/xmltree/xmlbuilder",
+    "tree/xmltree/xmlele",
+    "tree/xmltree/xmlnode",
+  ]
+  pruneopts = "UT"
+  revision = "2ad3b31cf4a21db70fc0cacd0e0120eaae566f98"
+  version = "v1.0-alpha3"
+
+[[projects]]
+  branch = "master"
   digest = "1:df265b7f54410945dad5cf5979d91461b9fa7ff9b397ab58d2d577002a8a0e24"
   name = "github.com/google/subcommands"
   packages = ["."]
   pruneopts = "UT"
   revision = "46f0354f63152e8801bb460d26f5b6c4c878efbb"
+
+[[projects]]
+  branch = "master"
+  digest = "1:a7c1ab68a6cdeffcb148dc0d8b92c897f034aa38f58b69eab9bc6e77645b26fb"
+  name = "github.com/masterzen/simplexml"
+  packages = ["dom"]
+  pruneopts = "UT"
+  revision = "4572e39b1ab9fe03ee513ce6fc7e289e98482190"
+
+[[projects]]
+  branch = "master"
+  digest = "1:da344f3de94ad2424502dab3e8877ec79cc12b377e5b509aa74c94a751ace974"
+  name = "github.com/masterzen/winrm"
+  packages = [
+    ".",
+    "soap",
+  ]
+  pruneopts = "UT"
+  revision = "a196a4ff2a86e262d40284f34b6d5bf328d22d29"
+
+[[projects]]
+  branch = "master"
+  digest = "1:0e1e5f960c58fdc677212fcc70e55042a0084d367623e51afbdb568963832f5d"
+  name = "github.com/nu7hatch/gouuid"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "179d4d0c4d8d407a32af483c2354df1d2c91e6c3"
 
 [[projects]]
   digest = "1:f4cbb10407f60c0263738e7b219b80ba99516aa9da187f44680d5b29360b3c9f"
@@ -66,6 +124,14 @@
   pruneopts = "UT"
   revision = "003f63b7f4cff3fc95357005358af2de0f5fe152"
   version = "v1.3.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:7d80d5561efbfcfdc3e4720bf5e331d574fd6f1e531b115ecf568aab3e2b656d"
+  name = "golang.org/x/crypto"
+  packages = ["md4"]
+  pruneopts = "UT"
+  revision = "3d3f9f413869b949e48070b5bc593aa22cc2b8f2"
 
 [[projects]]
   branch = "master"
@@ -131,6 +197,7 @@
   input-imports = [
     "github.com/golang/mock/gomock",
     "github.com/google/subcommands",
+    "github.com/masterzen/winrm",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/onsi/gomega/gbytes",
