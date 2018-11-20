@@ -12,28 +12,30 @@ import (
 )
 
 type ConstructCmd struct {
-	version     string
-	GlobalFlags *GlobalFlags
+	stemcellVersion string
+	winrmUsername string
+	winrmPassword string
+	winrmIP string
+	GlobalFlags     *GlobalFlags
 }
 
 func (*ConstructCmd) Name() string     { return "construct" }
-func (*ConstructCmd) Synopsis() string { return "Download stemcell automation articfact and lgpo" }
+func (*ConstructCmd) Synopsis() string { return "Transfer automation artifact and LGPO to vCenter" }
+
+//TODO: REWRITE USAGE
 func (*ConstructCmd) Usage() string {
-	return fmt.Sprintf(`%[1]s construct -version <stemcell version>
+	return fmt.Sprintf(`%[1]s construct -stemcellVersion <stemcell stemcellVersion>
 
-Create a BOSH Stemcell from a VMDK file
-
-The [vmdk], [version], and [os] flags must be specified.  If the [output] flag is
-not specified the stemcell will be created in the current working directory.
+The [stemcellVersion], [winrmUsername], [winrmPassword], [winrmIP] flags must be specified.
 
 Requirements:
 	The VMware 'ovftool' binary must be on your path or Fusion/Workstation
 	must be installed (both include the 'ovftool').
 
 Examples:
-	%[1]s -vmdk disk.vmdk -version 1.2 -os 1803
+	%[1]s -vmdk disk.vmdk -stemcellVersion 1.2 -os 1803
 
-	Will create an Windows 1803 stemcell using [vmdk] 'disk.vmdk', and set the stemcell version to 1.2.
+	Will create an Windows 1803 stemcell using [vmdk] 'disk.vmdk', and set the stemcell stemcellVersion to 1.2.
 	The final stemcell will be found in the current working directory.
 
 Flags:
@@ -41,8 +43,15 @@ Flags:
 }
 
 func (p *ConstructCmd) SetFlags(f *flag.FlagSet) {
-	f.StringVar(&p.version, "version", "", "Stemcell version in the form of [DIGITS].[DIGITS] (e.g. 123.01)")
-	f.StringVar(&p.version, "v", "", "Stemcell version (shorthand)")
+	f.StringVar(&p.stemcellVersion, "stemcellVersion", "", "Stemcell version in the form of [DIGITS].[DIGITS] (e.g. 123.01)")
+	f.StringVar(&p.stemcellVersion, "s", "", "Stemcell version (shorthand)")
+	f.StringVar(&p.winrmUsername, "winrmUsername", "", "Example: ")
+	f.StringVar(&p.winrmUsername, "u", "", "winrmUsername (shorthand)")
+	f.StringVar(&p.winrmPassword, "winrmPassword", "", "Example: ")
+	f.StringVar(&p.winrmPassword, "p", "", "winrmPassword (shorthand)")
+	f.StringVar(&p.winrmIP, "winrmIP", "", "Example: ")
+	f.StringVar(&p.winrmIP, "ip", "", "winrmIP (shorthand)")
+
 }
 func (p *ConstructCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	logLevel := colorlogger.NONE
@@ -50,13 +59,30 @@ func (p *ConstructCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interfac
 		logLevel = colorlogger.DEBUG
 	}
 	logger := colorlogger.ConstructLogger(logLevel, p.GlobalFlags.Color, os.Stderr)
-
 	logger.Debugf("hello, world.")
-	if !IsValidVersion(p.version) {
-		fmt.Fprintf(os.Stderr, "invalid version (%s) expected format [NUMBER].[NUMBER] or "+
-			"[NUMBER].[NUMBER].[NUMBER]\n", p.version)
+	if !IsValidVersion(p.stemcellVersion) {
+		fmt.Fprintf(os.Stderr, "invalid stemcellVersion (%s) expected format [NUMBER].[NUMBER] or "+
+			"[NUMBER].[NUMBER].[NUMBER]\n", p.stemcellVersion)
 
 		return subcommands.ExitFailure
+	}
+
+	pwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to find current working directory", err)
+		return subcommands.ExitFailure
+	}
+	automationArtifactPresent, err := IsArtifactInDirectory(pwd,"StemcellAutomation.zip")
+	if !automationArtifactPresent {
+		fmt.Fprintf(os.Stderr, "automation artifact not found in current directory")
+		return subcommands.ExitFailure
+		//TODO: Download automation Artifact
+	}
+	lgpoPresent, err := IsArtifactInDirectory(pwd,"LGPO.zip")
+	if !lgpoPresent {
+		fmt.Fprintf(os.Stderr, "lgpo not found in current directory")
+		return subcommands.ExitFailure
+		//TODO: Download LGPO
 	}
 
 	return subcommands.ExitSuccess
