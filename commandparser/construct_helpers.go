@@ -1,10 +1,12 @@
 package commandparser
 
-import  (
+import (
+	"github.com/masterzen/winrm"
 	//"fmt"
 	"os"
 	"path/filepath"
 )
+
 func IsArtifactInDirectory(directory string, artifactFileName string) (bool, error) {
 
 	if _, directoryErr := os.Stat(directory); os.IsNotExist(directoryErr) {
@@ -28,5 +30,3 @@ func RemoteExecuteAutomation(username string, password string, ip string) {
 	client.Run("Expand-Archive C:\\Provisioners\\StemcellAutomation.zip", os.Stdout, os.Stderr)
 	client.Run("./Setup.ps1", os.Stdout, os.Stderr)
 }
-
-

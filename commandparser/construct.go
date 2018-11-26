@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/masterzen/winrm"
 	"os"
 	"path/filepath"
 
@@ -14,9 +13,9 @@ import (
 
 type ConstructCmd struct {
 	stemcellVersion string
-	winrmUsername string
-	winrmPassword string
-	winrmIP string
+	winrmUsername   string
+	winrmPassword   string
+	winrmIP         string
 	GlobalFlags     *GlobalFlags
 }
 
@@ -70,25 +69,26 @@ func (p *ConstructCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interfac
 
 	pwd, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to find current working directory", err)
+		fmt.Fprint(os.Stderr, "unable to find current working directory", err)
 		return subcommands.ExitFailure
 	}
-	automationArtifactPresent, err := IsArtifactInDirectory(pwd,"StemcellAutomation.zip")
+	automationArtifactPresent, err := IsArtifactInDirectory(pwd, "StemcellAutomation.zip")
 	if !automationArtifactPresent {
 		fmt.Fprintf(os.Stderr, "automation artifact not found in current directory")
 		return subcommands.ExitFailure
 		//TODO: Download automation Artifact
 	}
-	lgpoPresent, err := IsArtifactInDirectory(pwd,"LGPO.zip")
+	lgpoPresent, err := IsArtifactInDirectory(pwd, "LGPO.zip")
 	if !lgpoPresent {
 		fmt.Fprintf(os.Stderr, "lgpo not found in current directory")
 		return subcommands.ExitFailure
 		//TODO: Download LGPO
 	}
 
+
 	//TODO: TRANSFER ARTIFACTTS
 
-	RemoteExecuteAutomation(p.winrmUsername, p.winrmPassword, p.winrmIP, )
+	RemoteExecuteAutomation(p.winrmUsername, p.winrmPassword, p.winrmIP)
 
 	return subcommands.ExitSuccess
 }
