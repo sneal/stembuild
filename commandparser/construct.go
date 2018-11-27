@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/subcommands"
 	"github.com/cloudfoundry-incubator/stembuild/colorlogger"
+	"github.com/google/subcommands"
 )
 
 type ConstructCmd struct {

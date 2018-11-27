@@ -1,9 +1,9 @@
 package commandparser_test
 
 import (
+	. "github.com/cloudfoundry-incubator/stembuild/commandparser"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	. "github.com/cloudfoundry-incubator/stembuild/commandparser"
 )
 
 var _ = Describe("Check if necessary files are in directory", func() {
