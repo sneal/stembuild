@@ -1,7 +1,6 @@
 package commandparser
 
 import (
-	"github.com/masterzen/winrm"
 	//"fmt"
 	"os"
 	"path/filepath"
@@ -21,12 +20,24 @@ func IsArtifactInDirectory(directory string, artifactFileName string) (bool, err
 	return true, nil
 }
 
-func RemoteExecuteAutomation(username string, password string, ip string) {
-	endpoint := winrm.NewEndpoint(ip, 5986, false, true, nil, nil, nil, 0)
-	client, err := winrm.NewClient(endpoint, username, password)
+func UploadArtifact(rm RemoteManager) error {
+	err := rm.UploadArtifact("./LGPO.zip", "C:\\provision\\LGPO.zip")
 	if err != nil {
-		panic(err)
+		return err
 	}
-	client.Run("Expand-Archive C:\\Provisioners\\StemcellAutomation.zip", os.Stdout, os.Stderr)
-	client.Run("./Setup.ps1", os.Stdout, os.Stderr)
+	err = rm.UploadArtifact("./StemcellAutomation.zip", "C:\\provision\\StemcellAutomation.zip")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ExtractArchive(rm RemoteManager) error {
+	err := rm.ExtractArchive("C:\\provision\\StemcellAutomation.zip", "C:\\provision\\")
+	return err
+}
+func ExecuteSetupScript(rm RemoteManager) error {
+	err := rm.ExecuteCommand("powershell.exe C:\\provision\\Setup.ps1")
+	return err
 }

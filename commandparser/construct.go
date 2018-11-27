@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/google/subcommands"
-	"github.com/pivotal-cf-experimental/stembuild/colorlogger"
+	"github.com/cloudfoundry-incubator/stembuild/colorlogger"
 )
 
 type ConstructCmd struct {
@@ -85,10 +85,25 @@ func (p *ConstructCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interfac
 		//TODO: Download LGPO
 	}
 
-
-	//TODO: TRANSFER ARTIFACTTS
-
-	RemoteExecuteAutomation(p.winrmUsername, p.winrmPassword, p.winrmIP)
+	remoteManager := NewWinRM(p.winrmIP, p.winrmUsername, p.winrmPassword)
+	fmt.Printf("upload artifact...")
+	err = UploadArtifact(remoteManager)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, err.Error())
+		return subcommands.ExitFailure
+	}
+	fmt.Printf("extract artifact...")
+	err = ExtractArchive(remoteManager)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, err.Error())
+		return subcommands.ExitFailure
+	}
+	fmt.Printf("execute script...")
+	err = ExecuteSetupScript(remoteManager)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, err.Error())
+		return subcommands.ExitFailure
+	}
 
 	return subcommands.ExitSuccess
 }

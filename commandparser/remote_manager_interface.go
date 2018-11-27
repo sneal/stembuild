@@ -1,5 +1,7 @@
 package commandparser
 
 type RemoteManager interface {
-	UploadArtifact(filePath string) error
+	UploadArtifact(source, destination string) error
+	ExtractArchive(source, destination string) error
+	ExecuteCommand(file string) error
 }
