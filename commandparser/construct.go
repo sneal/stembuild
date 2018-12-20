@@ -60,7 +60,7 @@ func (p *ConstructCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interfac
 	}
 	logger := colorlogger.ConstructLogger(logLevel, p.GlobalFlags.Color, os.Stderr)
 	logger.Debugf("hello, world.")
-	if !IsValidVersion(p.stemcellVersion) {
+	if !IsValidStemcellVersion(p.stemcellVersion) {
 		fmt.Fprintf(os.Stderr, "invalid stemcellVersion (%s) expected format [NUMBER].[NUMBER] or "+
 			"[NUMBER].[NUMBER].[NUMBER]\n", p.stemcellVersion)
 
