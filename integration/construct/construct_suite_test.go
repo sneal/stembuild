@@ -13,9 +13,9 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/concourse/pool-resource/out"
-
 	"github.com/masterzen/winrm"
+
+	"github.com/concourse/pool-resource/out"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -31,22 +31,22 @@ func TestConstruct(t *testing.T) {
 }
 
 const (
-	TargetIPRangeVariable    = "CONSTRUCT_TEST_IP_RANGE"
-	NetworkGatewayVariable   = "CONSTRUCT_TEST_GATEWAY"
-	SubnetMaskVariable       = "CONSTRUCT_TEST_SUBNET_MASK"
-	OvaFileVariable          = "OVA_FILE"
-	VMNamePrefixVariable     = "VM_NAME_PREFIX"
-	VMUsernameVariable       = "VM_USERNAME"
-	VMPasswordVariable       = "VM_PASSWORD"
-	ExistingTargetIPVariable = "EXISTING_TARGET_IP"
-	TargetIPVariable         = "TARGET_IP"
-	LockPrivateKeyVariable   = "LOCK_PRIVATE_KEY"
+	NetworkGatewayVariable = "CONSTRUCT_TEST_GATEWAY"
+	SubnetMaskVariable     = "CONSTRUCT_TEST_SUBNET_MASK"
+	OvaFileVariable        = "OVA_FILE"
+	VMNamePrefixVariable   = "VM_NAME_PREFIX"
+	VMUsernameVariable     = "VM_USERNAME"
+	VMPasswordVariable     = "VM_PASSWORD"
+	ExistingVmIPVariable   = "EXISTING_VM_IP"
+	UserProvidedIPVariable = "USER_PROVIDED_IP"
+	LockPrivateKeyVariable = "LOCK_PRIVATE_KEY"
 )
 
 var (
 	conf     config
 	tmpDir   string
 	lockPool out.LockPool
+	lockDir  string
 )
 
 type config struct {
@@ -65,14 +65,7 @@ func envMustExist(variableName string) string {
 	return result
 }
 
-func findAvailableIP(cidr string) string {
-
-	//If specific IP is given
-	//TODO: maybe if IP is given, don't enter this function or rename function name
-	givenIP := os.Getenv(TargetIPVariable)
-	if givenIP != "" {
-		return givenIP
-	}
+func claimAvailableIP() string {
 
 	lockPrivateKey := envMustExist(LockPrivateKeyVariable)
 	keyFile, err := ioutil.TempFile(os.TempDir(), "keyfile")
@@ -97,15 +90,19 @@ func findAvailableIP(cidr string) string {
 
 	ip, _, err := lockPool.AcquireLock()
 	Expect(err).NotTo(HaveOccurred())
-
 	Expect(ip).NotTo(Equal(""))
+
+	lockDir, err = ioutil.TempDir("", "acquired-lock")
+	Expect(err).NotTo(HaveOccurred())
+	err = ioutil.WriteFile(filepath.Join(lockDir, "name"), []byte(ip), os.ModePerm)
+	Expect(err).NotTo(HaveOccurred())
+
 	return ip
 }
 
 var _ = BeforeSuite(func() {
 	// Build a VM and wait for it's IP
 
-	targetIPRange := envMustExist(TargetIPRangeVariable)
 	networkGateway := envMustExist(NetworkGatewayVariable)
 	subnetMask := envMustExist(SubnetMaskVariable)
 	ovaFile := envMustExist(OvaFileVariable)
@@ -114,12 +111,19 @@ var _ = BeforeSuite(func() {
 	vmUsername := envMustExist(VMUsernameVariable)
 	vmPassword := envMustExist(VMPasswordVariable)
 
-	targetIP := os.Getenv(ExistingTargetIPVariable)
+	targetIP := os.Getenv(ExistingVmIPVariable) //TODO: make a boolean if existing machine should be used for readaibility
 
 	if targetIP == "" {
 
-		targetIP = findAvailableIP(targetIPRange)
-		//TODO: Delete below. Just for testing until we fix the fping issue
+		fmt.Println("No existing VM IP given")
+
+		givenIP := os.Getenv(UserProvidedIPVariable)
+		if givenIP != "" {
+			targetIP = givenIP
+		}
+
+		fmt.Println("No user-provided IP given. Finding available IP...")
+		targetIP = claimAvailableIP()
 		fmt.Printf("Target ip is %s\n", targetIP)
 
 		vmNameSuffix := strings.Split(targetIP, ".")[3]
@@ -161,38 +165,40 @@ var _ = BeforeSuite(func() {
 
 	endpoint := winrm.NewEndpoint(targetIP, 5985, false, true, nil, nil, nil, 0)
 	client, err := winrm.NewClient(endpoint, vmUsername, vmPassword)
-
-	fmt.Println(endpoint)
-	fmt.Println(client)
 	Expect(err).NotTo(HaveOccurred())
 
-	_, err = client.CreateShell()
-	Expect(err).NotTo(HaveOccurred())
-
-	//Eventually(func() error {
-	//}, 5*time.Second).Should(BeNil()) //TODO: Should this be different depending on whether we just created the VM or using an existing one Will need more time?
+	var shell *winrm.Shell
+	Eventually(func() error {
+		shell, err = client.CreateShell()
+		return err
+	}, 3*time.Minute).Should(BeNil()) //TODO: Should this be different depending on whether we just created the VM or using an existing one Will need more time?
+	shell.Close()
 
 })
 
 var _ = AfterSuite(func() {
 	//os.RemoveAll(tmpDir)
-	//TODO: power off VM, delete from disk, and unclaim IP from locks!
 
 	if conf.TargetIP != "" {
-		exitCode := cli.Run([]string{"vm.destroy", fmt.Sprintf("-vm.ip=%s", conf.TargetIP)})
-		Expect(exitCode).To(BeZero())
 
-		_, _, err := lockPool.ReleaseLock(conf.TargetIP)
-		Expect(err).NotTo(HaveOccurred())
+		delete_command := []string{"vm.destroy", fmt.Sprintf("-vm.ip=%s", conf.TargetIP)}
+		Eventually(func() int {
+			return cli.Run(delete_command)
+		}, 3*time.Minute).Should(BeZero())
 
-		tmpDir := os.TempDir()
-		childItems, err := ioutil.ReadDir(tmpDir)
-		Expect(err).NotTo(HaveOccurred())
+		if lockDir != "" {
+			_, _, err := lockPool.ReleaseLock(lockDir)
+			Expect(err).NotTo(HaveOccurred())
 
-		for _, item := range childItems {
-			if item.IsDir() && strings.HasPrefix(filepath.Base(item.Name()), "pool-resource") {
-				fmt.Printf("Cleaning up temporary pool resource %s\n", item.Name())
-				os.RemoveAll(item.Name())
+			tmpDir := os.TempDir()
+			childItems, err := ioutil.ReadDir(tmpDir)
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, item := range childItems {
+				if item.IsDir() && strings.HasPrefix(filepath.Base(item.Name()), "pool-resource") {
+					fmt.Printf("Cleaning up temporary pool resource %s\n", item.Name())
+					os.RemoveAll(item.Name())
+				}
 			}
 		}
 	}

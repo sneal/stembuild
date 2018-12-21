@@ -4,11 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
+	"path"
+	"testing/quick"
+
 	. "github.com/cloudfoundry-incubator/stembuild/commandparser"
 	"github.com/cloudfoundry-incubator/stembuild/version"
 	. "github.com/google/subcommands"
-	"os"
-	"path"
 )
 
 //go:generate go run gen.go
