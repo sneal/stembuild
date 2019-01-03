@@ -46,7 +46,6 @@ func (w *WinRM) ExecuteCommand(command string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("run some ish...")
 	_, err = client.RunWithInput(command, os.Stdout, os.Stderr, os.Stdin)
 	return err
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"testing/quick"
 
 	. "github.com/cloudfoundry-incubator/stembuild/commandparser"
 	"github.com/cloudfoundry-incubator/stembuild/version"

@@ -38,6 +38,6 @@ func ExtractArchive(rm RemoteManager) error {
 	return err
 }
 func ExecuteSetupScript(rm RemoteManager) error {
-	err := rm.ExecuteCommand("powershell.exe C:\\provision\\Setup.ps1")
+	err := rm.ExecuteCommand("powershell.exe C:\\provision\\StemcellAutomation\\Setup.ps1")
 	return err
 }

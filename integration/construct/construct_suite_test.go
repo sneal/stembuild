@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/cloudfoundry-incubator/stembuild/test/helpers"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -43,16 +44,20 @@ const (
 )
 
 var (
-	conf     config
-	tmpDir   string
-	lockPool out.LockPool
-	lockDir  string
+	conf                config
+	tmpDir              string
+	lockPool            out.LockPool
+	lockDir             string
+	stembuildExecutable string
 )
 
+//TODO: separate VM attributes from VCenter configuration
 type config struct {
 	TargetIP       string
 	NetworkGateway string
 	SubnetMask     string
+	VMUsername     string
+	VMPassword     string
 	VMName         string
 }
 
@@ -100,7 +105,11 @@ func claimAvailableIP() string {
 	return ip
 }
 
-var _ = BeforeSuite(func() {
+var _ = SynchronizedBeforeSuite(func() []byte {
+	var err error
+	stembuildExecutable, err = helpers.BuildStembuild()
+	Expect(err).NotTo(HaveOccurred())
+
 	// Build a VM and wait for it's IP
 
 	networkGateway := envMustExist(NetworkGatewayVariable)
@@ -112,6 +121,13 @@ var _ = BeforeSuite(func() {
 	vmPassword := envMustExist(VMPasswordVariable)
 
 	targetIP := os.Getenv(ExistingVmIPVariable) //TODO: make a boolean if existing machine should be used for readaibility
+	conf = config{
+		TargetIP:       targetIP,
+		NetworkGateway: networkGateway,
+		SubnetMask:     subnetMask,
+		VMUsername:     vmUsername,
+		VMPassword:     vmPassword,
+	}
 
 	if targetIP == "" {
 
@@ -124,17 +140,12 @@ var _ = BeforeSuite(func() {
 
 		fmt.Println("No user-provided IP given. Finding available IP...")
 		targetIP = claimAvailableIP()
+		conf.TargetIP = targetIP
 		fmt.Printf("Target ip is %s\n", targetIP)
 
 		vmNameSuffix := strings.Split(targetIP, ".")[3]
 		vmName := fmt.Sprintf("%s%s", vmNamePrefix, vmNameSuffix)
-
-		conf = config{
-			TargetIP:       targetIP,
-			NetworkGateway: networkGateway,
-			SubnetMask:     subnetMask,
-			VMName:         vmName,
-		}
+		conf.VMName = vmName
 
 		templateFile, err := filepath.Abs("assets/ova_options.json.template")
 		Expect(err).NotTo(HaveOccurred())
@@ -164,7 +175,7 @@ var _ = BeforeSuite(func() {
 	}
 
 	endpoint := winrm.NewEndpoint(targetIP, 5985, false, true, nil, nil, nil, 0)
-	client, err := winrm.NewClient(endpoint, vmUsername, vmPassword)
+	client, err := winrm.NewClient(endpoint, conf.VMUsername, conf.VMPassword)
 	Expect(err).NotTo(HaveOccurred())
 
 	var shell *winrm.Shell
@@ -173,19 +184,22 @@ var _ = BeforeSuite(func() {
 		return err
 	}, 3*time.Minute).Should(BeNil()) //TODO: Should this be different depending on whether we just created the VM or using an existing one Will need more time?
 	shell.Close()
+	fmt.Println("VM created and connected")
 
+	return nil
+}, func(_ []byte) {
 })
 
-var _ = AfterSuite(func() {
-	//os.RemoveAll(tmpDir)
-
+var _ = SynchronizedAfterSuite(func() {
+	os.RemoveAll(tmpDir)
+	return
 	if conf.TargetIP != "" {
 
 		delete_command := []string{"vm.destroy", fmt.Sprintf("-vm.ip=%s", conf.TargetIP)}
 		Eventually(func() int {
 			return cli.Run(delete_command)
 		}, 3*time.Minute).Should(BeZero())
-
+		fmt.Println("VM destroyed")
 		if lockDir != "" {
 			_, _, err := lockPool.ReleaseLock(lockDir)
 			Expect(err).NotTo(HaveOccurred())
@@ -202,4 +216,6 @@ var _ = AfterSuite(func() {
 			}
 		}
 	}
+}, func() {
+	Expect(os.RemoveAll(stembuildExecutable)).To(Succeed())
 })
