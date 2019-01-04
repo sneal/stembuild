@@ -24,33 +24,40 @@ func (*ConstructCmd) Synopsis() string { return "Transfer automation artifact an
 
 //TODO: REWRITE USAGE
 func (*ConstructCmd) Usage() string {
-	return fmt.Sprintf(`%[1]s construct -stemcellVersion <stemcell stemcellVersion>
+	return fmt.Sprintf(`%[1]s construct utilizes stemcell automation scripts to prepare a VM to be used by stembuild package.  
 
-The [stemcellVersion], [winrmUsername], [winrmPassword], [winrmIP] flags must be specified.
+The [stemcell-version], [winrmIP], [winrm-username], [winrmPassword] flags must be specified.
 
 Requirements:
-	The VMware 'ovftool' binary must be on your path or Fusion/Workstation
-	must be installed (both include the 'ovftool').
+	Running Windows VM with:
+		- Up to date Operating System
+		- WinRm enabled
+		- Reachable by IP
+		- Username and password with Administrator privileges 
+	StemcellAutomation.zip in current working directory
+	LGPO.zip in current working directory
 
 Examples:
-	%[1]s -vmdk disk.vmdk -stemcellVersion 1.2 -os 1803
-
-	Will create an Windows 1803 stemcell using [vmdk] 'disk.vmdk', and set the stemcell stemcellVersion to 1.2.
-	The final stemcell will be found in the current working directory.
+	%[1]s construct -stemcell-version 1709.1 -winrm-ip '10.0.0.5' -winrm-username Admin -winrm-password 'password'
+	
+	This will connect to VM with IP 10.0.0.5 using credentials Admin:password, upload and execute StemcellAutomation.zip found in the working directory.
+	StemcellAutomation.zip requires LGPO.zip to be present in the working directory.
+	When command exits successfully, the VM will be Sysprepped and powered off.
+	
 
 Flags:
 `, filepath.Base(os.Args[0]))
 }
 
 func (p *ConstructCmd) SetFlags(f *flag.FlagSet) {
-	f.StringVar(&p.stemcellVersion, "stemcellVersion", "", "Stemcell version in the form of [DIGITS].[DIGITS] (e.g. 123.01)")
+	f.StringVar(&p.stemcellVersion, "stemcell-version", "", "Stemcell version in the form of [DIGITS].[DIGITS] (e.g. 123.01)")
 	f.StringVar(&p.stemcellVersion, "s", "", "Stemcell version (shorthand)")
-	f.StringVar(&p.winrmUsername, "winrmUsername", "", "Example: ")
-	f.StringVar(&p.winrmUsername, "u", "", "winrmUsername (shorthand)")
-	f.StringVar(&p.winrmPassword, "winrmPassword", "", "Example: ")
-	f.StringVar(&p.winrmPassword, "p", "", "winrmPassword (shorthand)")
-	f.StringVar(&p.winrmIP, "winrmIP", "", "Example: ")
-	f.StringVar(&p.winrmIP, "ip", "", "winrmIP (shorthand)")
+	f.StringVar(&p.winrmIP, "winrm-ip", "", "IP of machine for WinRM connection")
+	f.StringVar(&p.winrmIP, "ip", "", "winrm-ip (shorthand)")
+	f.StringVar(&p.winrmUsername, "winrm-username", "", "Username for winRM connection")
+	f.StringVar(&p.winrmUsername, "u", "", "winrm-username (shorthand)")
+	f.StringVar(&p.winrmPassword, "winrm-password", "", "Password for winRM connection")
+	f.StringVar(&p.winrmPassword, "p", "", "winrm-password (shorthand)")
 
 }
 func (p *ConstructCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
