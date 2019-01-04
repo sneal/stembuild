@@ -2,13 +2,14 @@ package construct_test
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+
 	"github.com/cloudfoundry-incubator/stembuild/test/helpers"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
 	. "github.com/onsi/gomega/gexec"
-	"io/ioutil"
-	"os"
 )
 
 var _ = Describe("stembuild construct", func() {
@@ -20,14 +21,14 @@ var _ = Describe("stembuild construct", func() {
 		CopyFile(fmt.Sprintf(pwd+"/assets/StemcellAutomation.zip"), fmt.Sprintf(pwd+"/StemcellAutomation.zip"))
 		CopyFile(fmt.Sprintf(pwd+"/assets/LGPO.zip"), fmt.Sprintf(pwd+"/LGPO.zip"))
 
-		session := helpers.Stembuild(stembuildExecutable, "construct", "-winrmIP", conf.TargetIP, "-stemcellVersion", "1709.1", "-winrmUsername", conf.VMUsername, "-winrmPassword", conf.VMPassword)
+		session := helpers.Stembuild(stembuildExecutable, "construct", "-winrm-ip", conf.TargetIP, "-stemcell-version", "1709.1", "-winrm-username", conf.VMUsername, "-winrm-password", conf.VMPassword)
 
 		Eventually(session, 20).Should(Exit(0))
 		Eventually(session.Out).Should(Say(`mock stemcell automation script executed`))
 	})
 
 	It("fails with an appropriate error when LGPO and/or StemcellAutomation is missing", func() {
-		session := helpers.Stembuild(stembuildExecutable, "construct", "-winrmIP", conf.TargetIP, "-stemcellVersion", "1803.1", "-winrmUsername", conf.VMUsername, "-winrmPassword", conf.VMPassword)
+		session := helpers.Stembuild(stembuildExecutable, "construct", "-winrm-ip", conf.TargetIP, "-stemcell-version", "1803.1", "-winrm-username", conf.VMUsername, "-winrm-password", conf.VMPassword)
 
 		Eventually(session, 20).Should(Exit(1))
 		Eventually(session.Err).Should(Say(`automation artifact not found in current directory`))

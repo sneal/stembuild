@@ -24,9 +24,9 @@ func (*ConstructCmd) Synopsis() string { return "Transfer automation artifact an
 
 //TODO: REWRITE USAGE
 func (*ConstructCmd) Usage() string {
-	return fmt.Sprintf(`%[1]s construct utilizes stemcell automation scripts to prepare a VM to be used by stembuild package.  
+	return fmt.Sprintf(`%[1]s construct utilizes stemcell automation scripts to prepare a VM to be used by stembuild package.
 
-The [stemcell-version], [winrmIP], [winrm-username], [winrmPassword] flags must be specified.
+The [stemcell-version], [winrm-ip], [winrm-username], [winrm-password] flags must be specified.
 
 Requirements:
 	Running Windows VM with:
@@ -39,11 +39,11 @@ Requirements:
 
 Examples:
 	%[1]s construct -stemcell-version 1709.1 -winrm-ip '10.0.0.5' -winrm-username Admin -winrm-password 'password'
-	
+
 	This will connect to VM with IP 10.0.0.5 using credentials Admin:password, upload and execute StemcellAutomation.zip found in the working directory.
 	StemcellAutomation.zip requires LGPO.zip to be present in the working directory.
 	When command exits successfully, the VM will be Sysprepped and powered off.
-	
+
 
 Flags:
 `, filepath.Base(os.Args[0]))

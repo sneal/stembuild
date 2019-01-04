@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/cloudfoundry-incubator/stembuild/test/helpers"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -13,6 +12,8 @@ import (
 	"testing"
 	"text/template"
 	"time"
+
+	"github.com/cloudfoundry-incubator/stembuild/test/helpers"
 
 	"github.com/masterzen/winrm"
 
@@ -32,8 +33,8 @@ func TestConstruct(t *testing.T) {
 }
 
 const (
-	NetworkGatewayVariable = "CONSTRUCT_TEST_GATEWAY"
-	SubnetMaskVariable     = "CONSTRUCT_TEST_SUBNET_MASK"
+	NetworkGatewayVariable = "NETWORK_GATEWAY"
+	SubnetMaskVariable     = "SUBNET_MASK"
 	OvaFileVariable        = "OVA_FILE"
 	VMNamePrefixVariable   = "VM_NAME_PREFIX"
 	VMUsernameVariable     = "VM_USERNAME"
@@ -49,9 +50,9 @@ var (
 	lockPool            out.LockPool
 	lockDir             string
 	stembuildExecutable string
+	existingVM          bool
 )
 
-//TODO: separate VM attributes from VCenter configuration
 type config struct {
 	TargetIP       string
 	NetworkGateway string
@@ -71,7 +72,6 @@ func envMustExist(variableName string) string {
 }
 
 func claimAvailableIP() string {
-
 	lockPrivateKey := envMustExist(LockPrivateKeyVariable)
 	keyFile, err := ioutil.TempFile(os.TempDir(), "keyfile")
 	Expect(err).NotTo(HaveOccurred())
@@ -106,74 +106,44 @@ func claimAvailableIP() string {
 }
 
 var _ = SynchronizedBeforeSuite(func() []byte {
+	existingVM = false
 	var err error
+	var targetIP string
 	stembuildExecutable, err = helpers.BuildStembuild()
 	Expect(err).NotTo(HaveOccurred())
 
-	// Build a VM and wait for it's IP
-
 	networkGateway := envMustExist(NetworkGatewayVariable)
 	subnetMask := envMustExist(SubnetMaskVariable)
-	ovaFile := envMustExist(OvaFileVariable)
-
-	vmNamePrefix := envMustExist(VMNamePrefixVariable)
 	vmUsername := envMustExist(VMUsernameVariable)
 	vmPassword := envMustExist(VMPasswordVariable)
 
-	targetIP := os.Getenv(ExistingVmIPVariable) //TODO: make a boolean if existing machine should be used for readaibility
+	existingVMIP := os.Getenv(ExistingVmIPVariable)
 	conf = config{
-		TargetIP:       targetIP,
+		TargetIP:       existingVMIP,
 		NetworkGateway: networkGateway,
 		SubnetMask:     subnetMask,
 		VMUsername:     vmUsername,
 		VMPassword:     vmPassword,
 	}
+	userProvidedIP := os.Getenv(UserProvidedIPVariable)
 
+	if userProvidedIP != "" && existingVMIP == "" {
+		fmt.Printf("Creating VM with IP: %s\n", targetIP)
+		targetIP = userProvidedIP
+		createVMWithIP(targetIP)
+	}
+	if existingVMIP != "" {
+		existingVM = true
+		fmt.Printf("Using existing VM with IP: %s\n", existingVMIP)
+		targetIP = existingVMIP
+	}
 	if targetIP == "" {
-
-		fmt.Println("No existing VM IP given")
-
-		givenIP := os.Getenv(UserProvidedIPVariable)
-		if givenIP != "" {
-			targetIP = givenIP
-		}
-
-		fmt.Println("No user-provided IP given. Finding available IP...")
+		fmt.Println("Finding available IP...")
 		targetIP = claimAvailableIP()
-		conf.TargetIP = targetIP
-		fmt.Printf("Target ip is %s\n", targetIP)
-
-		vmNameSuffix := strings.Split(targetIP, ".")[3]
-		vmName := fmt.Sprintf("%s%s", vmNamePrefix, vmNameSuffix)
-		conf.VMName = vmName
-
-		templateFile, err := filepath.Abs("assets/ova_options.json.template")
-		Expect(err).NotTo(HaveOccurred())
-		tmpl, err := template.New("ova_options.json.template").ParseFiles(templateFile)
-
-		tmpDir, err = ioutil.TempDir("", "construct-test")
-		Expect(err).NotTo(HaveOccurred())
-
-		tmpFile, err := ioutil.TempFile(tmpDir, "ova_options*.json")
-		Expect(err).NotTo(HaveOccurred())
-
-		err = tmpl.Execute(tmpFile, conf)
-		Expect(err).NotTo(HaveOccurred())
-
-		opts := []string{
-			"import.ova",
-			fmt.Sprintf("--options=%s", tmpFile.Name()),
-			fmt.Sprintf("--name=%s", vmName),
-			"--folder=/canada-dc/vm/winnipeg",
-			ovaFile,
-		}
-
-		fmt.Printf("Opts are %s", opts)
-
-		exitCode := cli.Run(opts)
-		Expect(exitCode).To(BeZero())
+		createVMWithIP(targetIP)
 	}
 
+	fmt.Println("Attempting to connect to VM")
 	endpoint := winrm.NewEndpoint(targetIP, 5985, false, true, nil, nil, nil, 0)
 	client, err := winrm.NewClient(endpoint, conf.VMUsername, conf.VMPassword)
 	Expect(err).NotTo(HaveOccurred())
@@ -182,19 +152,58 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	Eventually(func() error {
 		shell, err = client.CreateShell()
 		return err
-	}, 3*time.Minute).Should(BeNil()) //TODO: Should this be different depending on whether we just created the VM or using an existing one Will need more time?
+	}, 3*time.Minute).Should(BeNil())
 	shell.Close()
-	fmt.Println("VM created and connected")
+	fmt.Println("Successfully connected to VM")
 
 	return nil
 }, func(_ []byte) {
 })
 
+func createVMWithIP(targetIP string) {
+	ovaFile := envMustExist(OvaFileVariable)
+
+	vmNamePrefix := envMustExist(VMNamePrefixVariable)
+
+	conf.TargetIP = targetIP
+	fmt.Printf("Target ip is %s\n", targetIP)
+
+	vmNameSuffix := strings.Split(targetIP, ".")[3]
+	vmName := fmt.Sprintf("%s%s", vmNamePrefix, vmNameSuffix)
+	conf.VMName = vmName
+
+	templateFile, err := filepath.Abs("assets/ova_options.json.template")
+	Expect(err).NotTo(HaveOccurred())
+	tmpl, err := template.New("ova_options.json.template").ParseFiles(templateFile)
+
+	tmpDir, err = ioutil.TempDir("", "construct-test")
+	Expect(err).NotTo(HaveOccurred())
+
+	tmpFile, err := ioutil.TempFile(tmpDir, "ova_options*.json")
+	Expect(err).NotTo(HaveOccurred())
+
+	err = tmpl.Execute(tmpFile, conf)
+	Expect(err).NotTo(HaveOccurred())
+
+	opts := []string{
+		"import.ova",
+		fmt.Sprintf("--options=%s", tmpFile.Name()),
+		fmt.Sprintf("--name=%s", vmName),
+		"--folder=/canada-dc/vm/winnipeg",
+		ovaFile,
+	}
+
+	fmt.Printf("Opts are %s", opts)
+
+	exitCode := cli.Run(opts)
+	Expect(exitCode).To(BeZero())
+
+}
+
 var _ = SynchronizedAfterSuite(func() {
 	os.RemoveAll(tmpDir)
-	return
-	if conf.TargetIP != "" {
 
+	if !existingVM {
 		delete_command := []string{"vm.destroy", fmt.Sprintf("-vm.ip=%s", conf.TargetIP)}
 		Eventually(func() int {
 			return cli.Run(delete_command)
