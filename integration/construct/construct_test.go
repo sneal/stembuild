@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/cloudfoundry-incubator/stembuild/test/helpers"
 	. "github.com/onsi/ginkgo"
@@ -13,13 +14,21 @@ import (
 )
 
 var _ = Describe("stembuild construct", func() {
+	var workingDir string
+
+	BeforeEach(func() {
+		var err error
+		workingDir, err = os.Getwd()
+		Expect(err).ToNot(HaveOccurred())
+
+	})
+
 	It("transfers LGPO and StemcellAutomation archives, unarchive them and execute automation script", func() {
-		pwd, err := os.Getwd()
-		if err != nil {
-			fmt.Fprint(os.Stderr, "unable to find current working directory", err)
-		}
-		CopyFile(fmt.Sprintf(pwd+"/assets/StemcellAutomation.zip"), fmt.Sprintf(pwd+"/StemcellAutomation.zip"))
-		CopyFile(fmt.Sprintf(pwd+"/assets/LGPO.zip"), fmt.Sprintf(pwd+"/LGPO.zip"))
+		err := CopyFile(filepath.Join(workingDir, "assets", "StemcellAutomation.zip"), filepath.Join(workingDir, "StemcellAutomation.zip"))
+		Expect(err).ToNot(HaveOccurred())
+
+		err = CopyFile(filepath.Join(workingDir, "assets", "LGPO.zip"), filepath.Join(workingDir, "LGPO.zip"))
+		Expect(err).ToNot(HaveOccurred())
 
 		session := helpers.Stembuild(stembuildExecutable, "construct", "-winrm-ip", conf.TargetIP, "-stemcell-version", "1709.1", "-winrm-username", conf.VMUsername, "-winrm-password", conf.VMPassword)
 
@@ -35,13 +44,8 @@ var _ = Describe("stembuild construct", func() {
 	})
 
 	AfterEach(func() {
-		pwd, err := os.Getwd()
-		if err != nil {
-			fmt.Fprint(os.Stderr, "unable to find current working directory", err)
-		}
-
-		os.Remove(fmt.Sprintf(pwd + "/StemcellAutomation.zip"))
-		os.Remove(fmt.Sprintf(pwd + "/LGPO.zip"))
+		_ = os.Remove(filepath.Join(workingDir, "StemcellAutomation.zip"))
+		_ = os.Remove(filepath.Join(workingDir, "LGPO.zip"))
 	})
 })
 

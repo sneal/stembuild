@@ -20,11 +20,12 @@ type ConstructCmd struct {
 }
 
 func (*ConstructCmd) Name() string     { return "construct" }
-func (*ConstructCmd) Synopsis() string { return "Transfer automation artifact and LGPO to vCenter" }
+func (*ConstructCmd) Synopsis() string { return "Transfer automation artifact and LGPO to a vCenter VM" }
 
-//TODO: REWRITE USAGE
 func (*ConstructCmd) Usage() string {
-	return fmt.Sprintf(`%[1]s construct utilizes stemcell automation scripts to prepare a VM to be used by stembuild package.
+	return fmt.Sprintf(`%[1]s construct -stemcell-version <stemcell stemcellVersion> -winrm-ip <winrm ip of VM> -winrm-username <winrm username> -winrm-password <winrm password>
+
+Prepare a VM to be used by stembuild package. It leverages Stemcell Automation Scripts to construct a VM to be used as a stemcell.
 
 The [stemcell-version], [winrm-ip], [winrm-username], [winrm-password] flags must be specified.
 
@@ -44,7 +45,6 @@ Examples:
 	StemcellAutomation.zip requires LGPO.zip to be present in the working directory.
 	When command exits successfully, the VM will be Sysprepped and powered off.
 
-
 Flags:
 `, filepath.Base(os.Args[0]))
 }
@@ -58,8 +58,8 @@ func (p *ConstructCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&p.winrmUsername, "u", "", "winrm-username (shorthand)")
 	f.StringVar(&p.winrmPassword, "winrm-password", "", "Password for winRM connection")
 	f.StringVar(&p.winrmPassword, "p", "", "winrm-password (shorthand)")
-
 }
+
 func (p *ConstructCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	logLevel := colorlogger.NONE
 	if p.GlobalFlags.Debug {
@@ -68,7 +68,7 @@ func (p *ConstructCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interfac
 	logger := colorlogger.ConstructLogger(logLevel, p.GlobalFlags.Color, os.Stderr)
 	logger.Debugf("hello, world.")
 	if !IsValidStemcellVersion(p.stemcellVersion) {
-		fmt.Fprintf(os.Stderr, "invalid stemcellVersion (%s) expected format [NUMBER].[NUMBER] or "+
+		_, _ = fmt.Fprintf(os.Stderr, "invalid stemcellVersion (%s) expected format [NUMBER].[NUMBER] or "+
 			"[NUMBER].[NUMBER].[NUMBER]\n", p.stemcellVersion)
 
 		return subcommands.ExitFailure
@@ -76,39 +76,37 @@ func (p *ConstructCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interfac
 
 	pwd, err := os.Getwd()
 	if err != nil {
-		fmt.Fprint(os.Stderr, "unable to find current working directory", err)
+		_, _ = fmt.Fprint(os.Stderr, "unable to find current working directory", err)
 		return subcommands.ExitFailure
 	}
 	automationArtifactPresent, err := IsArtifactInDirectory(pwd, "StemcellAutomation.zip")
 	if !automationArtifactPresent {
-		fmt.Fprintf(os.Stderr, "automation artifact not found in current directory")
+		_, _ = fmt.Fprintf(os.Stderr, "automation artifact not found in current directory")
 		return subcommands.ExitFailure
-		//TODO: Download automation Artifact
 	}
 	lgpoPresent, err := IsArtifactInDirectory(pwd, "LGPO.zip")
 	if !lgpoPresent {
-		fmt.Fprintf(os.Stderr, "lgpo not found in current directory")
+		_, _ = fmt.Fprintf(os.Stderr, "lgpo not found in current directory")
 		return subcommands.ExitFailure
-		//TODO: Download LGPO
 	}
 
 	remoteManager := NewWinRM(p.winrmIP, p.winrmUsername, p.winrmPassword)
 	fmt.Printf("upload artifact...")
 	err = UploadArtifact(remoteManager)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
+		_, _ = fmt.Fprintf(os.Stderr, err.Error())
 		return subcommands.ExitFailure
 	}
 	fmt.Printf("extract artifact...")
 	err = ExtractArchive(remoteManager)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
+		_, _ = fmt.Fprintf(os.Stderr, err.Error())
 		return subcommands.ExitFailure
 	}
 	fmt.Printf("execute script...")
 	err = ExecuteSetupScript(remoteManager)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
+		_, _ = fmt.Fprintf(os.Stderr, err.Error())
 		return subcommands.ExitFailure
 	}
 

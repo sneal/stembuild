@@ -18,6 +18,8 @@ func main() {
 	var gf GlobalFlags
 	packageCmd := PackageCmd{}
 	packageCmd.GlobalFlags = &gf
+	constructCmd := ConstructCmd{}
+	constructCmd.GlobalFlags = &gf
 
 	var commands = make([]Command, 0)
 
@@ -34,7 +36,10 @@ func main() {
 	commands = append(commands, sh)
 
 	commander.Register(&packageCmd, "")
+	commander.Register(&constructCmd, "")
+
 	commands = append(commands, &packageCmd)
+	commands = append(commands, &constructCmd)
 
 	// Override the default usage text of Google's Subcommand with our own
 	fs.Usage = func() { sh.Explain(commander.Error) }
@@ -45,11 +50,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	constructCmd := ConstructCmd{}
-	constructCmd.GlobalFlags = &gf
-	commander.Register(&constructCmd, "")
-
-	fs.Parse(os.Args[1:])
 	ctx := context.Background()
 	os.Exit(int(commander.Execute(ctx)))
 }

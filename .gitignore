@@ -9,4 +9,3 @@ rdiff/*.h
 test/data/expected.vmdk.lck/*
 version/version.go
 **.ova
-**.envrc
