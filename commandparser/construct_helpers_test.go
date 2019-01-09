@@ -9,7 +9,7 @@ import (
 
 var _ = Describe("construct_helpers", func() {
 
-	Context("IsArtifactInDirectory", func() {
+	Describe("IsArtifactInDirectory", func() {
 		Context("Directory given is valid", func() {
 			Describe("automation artifact", func() {
 				filename := "StemcellAutomation.zip"

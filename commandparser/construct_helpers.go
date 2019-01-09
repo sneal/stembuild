@@ -18,25 +18,3 @@ func IsArtifactInDirectory(directory string, artifactFileName string) (bool, err
 	}
 	return true, nil
 }
-
-func UploadArtifact(rm RemoteManager) error {
-	err := rm.UploadArtifact("./LGPO.zip", "C:\\provision\\LGPO.zip")
-	if err != nil {
-		return err
-	}
-	err = rm.UploadArtifact("./StemcellAutomation.zip", "C:\\provision\\StemcellAutomation.zip")
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func ExtractArchive(rm RemoteManager) error {
-	err := rm.ExtractArchive("C:\\provision\\StemcellAutomation.zip", "C:\\provision\\")
-	return err
-}
-func ExecuteSetupScript(rm RemoteManager) error {
-	err := rm.ExecuteCommand("powershell.exe C:\\provision\\StemcellAutomation\\Setup.ps1")
-	return err
-}

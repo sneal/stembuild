@@ -1,4 +1,6 @@
-package commandparser
+package remotemanager
+
+//go:generate mockgen -source=remotemanager.go -destination=mock/mock_remotemanager.go RemoteManager
 
 type RemoteManager interface {
 	UploadArtifact(source, destination string) error

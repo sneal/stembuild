@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	. "github.com/cloudfoundry-incubator/stembuild/construct"
 	"os"
 	"path/filepath"
 
@@ -90,21 +91,8 @@ func (p *ConstructCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interfac
 		return subcommands.ExitFailure
 	}
 
-	remoteManager := NewWinRM(p.winrmIP, p.winrmUsername, p.winrmPassword)
-	fmt.Printf("upload artifact...")
-	err = UploadArtifact(remoteManager)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, err.Error())
-		return subcommands.ExitFailure
-	}
-	fmt.Printf("extract artifact...")
-	err = ExtractArchive(remoteManager)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, err.Error())
-		return subcommands.ExitFailure
-	}
-	fmt.Printf("execute script...")
-	err = ExecuteSetupScript(remoteManager)
+	vmConstruct := NewVMConstruct(p.winrmIP, p.winrmUsername, p.winrmPassword)
+	err = vmConstruct.PrepareVM()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, err.Error())
 		return subcommands.ExitFailure

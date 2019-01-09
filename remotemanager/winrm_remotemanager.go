@@ -1,4 +1,4 @@
-package commandparser
+package remotemanager
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ type WinRM struct {
 	password string
 }
 
-func NewWinRM(host, username, password string) *WinRM {
+func NewWinRM(host, username, password string) RemoteManager {
 	return &WinRM{host, username, password}
 }
 
@@ -36,8 +36,8 @@ func (w *WinRM) UploadArtifact(sourceFilePath, destinationFilePath string) error
 
 func (w *WinRM) ExtractArchive(source, destination string) error {
 	command := fmt.Sprintf("powershell.exe Expand-Archive %s %s", source, destination)
-	w.ExecuteCommand(command)
-	return nil
+	err := w.ExecuteCommand(command)
+	return err
 }
 
 func (w *WinRM) ExecuteCommand(command string) error {
