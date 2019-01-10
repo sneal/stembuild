@@ -75,8 +75,8 @@ func claimAvailableIP() string {
 	lockPrivateKey := envMustExist(LockPrivateKeyVariable)
 	keyFile, err := ioutil.TempFile(os.TempDir(), "keyfile")
 	Expect(err).NotTo(HaveOccurred())
-	keyFile.Write([]byte(lockPrivateKey))
-	keyFile.Chmod(0600)
+	_, _ = keyFile.Write([]byte(lockPrivateKey))
+	_ = keyFile.Chmod(0600)
 
 	err = exec.Command("ssh-add", keyFile.Name()).Run()
 	Expect(err).NotTo(HaveOccurred())
@@ -112,20 +112,16 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	stembuildExecutable, err = helpers.BuildStembuild()
 	Expect(err).NotTo(HaveOccurred())
 
-	networkGateway := envMustExist(NetworkGatewayVariable)
-	subnetMask := envMustExist(SubnetMaskVariable)
 	vmUsername := envMustExist(VMUsernameVariable)
 	vmPassword := envMustExist(VMPasswordVariable)
-
 	existingVMIP := os.Getenv(ExistingVmIPVariable)
-	conf = config{
-		TargetIP:       existingVMIP,
-		NetworkGateway: networkGateway,
-		SubnetMask:     subnetMask,
-		VMUsername:     vmUsername,
-		VMPassword:     vmPassword,
-	}
 	userProvidedIP := os.Getenv(UserProvidedIPVariable)
+
+	conf = config{
+		TargetIP:   existingVMIP,
+		VMUsername: vmUsername,
+		VMPassword: vmPassword,
+	}
 
 	if userProvidedIP != "" && existingVMIP == "" {
 		fmt.Printf("Creating VM with IP: %s\n", targetIP)
@@ -145,7 +141,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 	fmt.Println("Attempting to connect to VM")
 	endpoint := winrm.NewEndpoint(targetIP, 5985, false, true, nil, nil, nil, 0)
-	client, err := winrm.NewClient(endpoint, conf.VMUsername, conf.VMPassword)
+	client, err := winrm.NewClient(endpoint, vmUsername, vmPassword)
 	Expect(err).NotTo(HaveOccurred())
 
 	var shell *winrm.Shell
@@ -153,7 +149,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		shell, err = client.CreateShell()
 		return err
 	}, 3*time.Minute).Should(BeNil())
-	shell.Close()
+	_ = shell.Close()
 	fmt.Println("Successfully connected to VM")
 
 	return nil
@@ -164,6 +160,8 @@ func createVMWithIP(targetIP string) {
 	ovaFile := envMustExist(OvaFileVariable)
 
 	vmNamePrefix := envMustExist(VMNamePrefixVariable)
+	conf.NetworkGateway = envMustExist(NetworkGatewayVariable)
+	conf.SubnetMask = envMustExist(SubnetMaskVariable)
 
 	conf.TargetIP = targetIP
 	fmt.Printf("Target ip is %s\n", targetIP)
@@ -201,12 +199,12 @@ func createVMWithIP(targetIP string) {
 }
 
 var _ = SynchronizedAfterSuite(func() {
-	os.RemoveAll(tmpDir)
+	_ = os.RemoveAll(tmpDir)
 
 	if !existingVM {
-		delete_command := []string{"vm.destroy", fmt.Sprintf("-vm.ip=%s", conf.TargetIP)}
+		deleteCommand := []string{"vm.destroy", fmt.Sprintf("-vm.ip=%s", conf.TargetIP)}
 		Eventually(func() int {
-			return cli.Run(delete_command)
+			return cli.Run(deleteCommand)
 		}, 3*time.Minute).Should(BeZero())
 		fmt.Println("VM destroyed")
 		if lockDir != "" {
@@ -220,7 +218,7 @@ var _ = SynchronizedAfterSuite(func() {
 			for _, item := range childItems {
 				if item.IsDir() && strings.HasPrefix(filepath.Base(item.Name()), "pool-resource") {
 					fmt.Printf("Cleaning up temporary pool resource %s\n", item.Name())
-					os.RemoveAll(item.Name())
+					_ = os.RemoveAll(item.Name())
 				}
 			}
 		}

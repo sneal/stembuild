@@ -1,7 +1,9 @@
 package remotemanager
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -46,6 +48,10 @@ func (w *WinRM) ExecuteCommand(command string) error {
 	if err != nil {
 		return err
 	}
-	_, err = client.RunWithInput(command, os.Stdout, os.Stderr, os.Stdin)
+	errBuffer := new(bytes.Buffer)
+	exitCode, err := client.RunWithInput(command, os.Stdout, io.MultiWriter(errBuffer, os.Stderr), os.Stdin)
+	if err == nil && exitCode != 0 {
+		err = fmt.Errorf("powershell encountered an issue: %s", errBuffer.String())
+	}
 	return err
 }

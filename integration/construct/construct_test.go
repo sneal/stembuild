@@ -2,6 +2,7 @@ package construct_test
 
 import (
 	"fmt"
+	"github.com/cloudfoundry-incubator/stembuild/remotemanager"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -23,17 +24,25 @@ var _ = Describe("stembuild construct", func() {
 
 	})
 
-	It("transfers LGPO and StemcellAutomation archives, unarchive them and execute automation script", func() {
-		err := CopyFile(filepath.Join(workingDir, "assets", "StemcellAutomation.zip"), filepath.Join(workingDir, "StemcellAutomation.zip"))
-		Expect(err).ToNot(HaveOccurred())
+	Context("run successfully", func() {
+		It("transfers LGPO and StemcellAutomation archives, unarchive them and execute automation script", func() {
+			err := CopyFile(filepath.Join(workingDir, "assets", "StemcellAutomation.zip"), filepath.Join(workingDir, "StemcellAutomation.zip"))
+			Expect(err).ToNot(HaveOccurred())
 
-		err = CopyFile(filepath.Join(workingDir, "assets", "LGPO.zip"), filepath.Join(workingDir, "LGPO.zip"))
-		Expect(err).ToNot(HaveOccurred())
+			err = CopyFile(filepath.Join(workingDir, "assets", "LGPO.zip"), filepath.Join(workingDir, "LGPO.zip"))
+			Expect(err).ToNot(HaveOccurred())
 
-		session := helpers.Stembuild(stembuildExecutable, "construct", "-winrm-ip", conf.TargetIP, "-stemcell-version", "1709.1", "-winrm-username", conf.VMUsername, "-winrm-password", conf.VMPassword)
+			session := helpers.Stembuild(stembuildExecutable, "construct", "-winrm-ip", conf.TargetIP, "-stemcell-version", "1709.1", "-winrm-username", conf.VMUsername, "-winrm-password", conf.VMPassword)
 
-		Eventually(session, 20).Should(Exit(0))
-		Eventually(session.Out).Should(Say(`mock stemcell automation script executed`))
+			Eventually(session, 20).Should(Exit(0))
+			Eventually(session.Out).Should(Say(`mock stemcell automation script executed`))
+		})
+
+		AfterEach(func() {
+			rm := remotemanager.NewWinRM(conf.TargetIP, conf.VMUsername, conf.VMPassword)
+			err := rm.ExecuteCommand("powershell.exe Remove-Item c:\\provision -recurse")
+			Expect(err).ToNot(HaveOccurred())
+		})
 	})
 
 	It("fails with an appropriate error when LGPO and/or StemcellAutomation is missing", func() {
