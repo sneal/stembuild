@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/cloudfoundry-incubator/stembuild/filesystem"
 
@@ -21,6 +22,16 @@ func (v VCenterPackager) Package() error {
 	if err != nil {
 		return errors.New("could not prepare the VM for export")
 	}
+	err = v.Client.ExportVM(v.SourceConfig.VmInventoryPath)
+	if err != nil {
+		return errors.New("failed to export the prepared VM")
+	}
+
+	splitVmInventoryPath := strings.Split(v.SourceConfig.VmInventoryPath, "/")
+	vmName := splitVmInventoryPath[len(splitVmInventoryPath)-1]
+
+	_, err = TarGenerator("image", vmName)
+
 	return nil
 }
 

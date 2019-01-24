@@ -3,6 +3,8 @@ package iaas_cli
 import (
 	_ "github.com/vmware/govmomi/govc/about"
 	"github.com/vmware/govmomi/govc/cli"
+	_ "github.com/vmware/govmomi/govc/device"
+	_ "github.com/vmware/govmomi/govc/export"
 	_ "github.com/vmware/govmomi/govc/object"
 )
 

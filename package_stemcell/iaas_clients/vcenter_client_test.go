@@ -104,7 +104,7 @@ var _ = Describe("VcenterClient", func() {
 
 	Context("PrepareVM", func() {
 		It("removes the ethernet device", func() {
-			expectedArgs := []string{"device.remove", "-vm", "validVMPath", "ethernet-0", "-u", credentialUrl}
+			expectedArgs := []string{"device.remove", "-u", credentialUrl, "-vm", "validVMPath", "ethernet-0"}
 			runner.RunReturns(0)
 			err := vcenterClient.PrepareVM("validVMPath")
 
@@ -117,7 +117,7 @@ var _ = Describe("VcenterClient", func() {
 		})
 
 		It("returns an error if it was not able to remove ethernet-0 for some reason", func() {
-			expectedArgs := []string{"device.remove", "-vm", "validVMPath", "ethernet-0", "-u", credentialUrl}
+			expectedArgs := []string{"device.remove", "-u", credentialUrl, "-vm", "validVMPath", "ethernet-0"}
 			runner.RunReturns(1)
 			err := vcenterClient.PrepareVM("validVMPath")
 
@@ -130,7 +130,7 @@ var _ = Describe("VcenterClient", func() {
 		})
 
 		It("removes the virtual floppy device", func() {
-			expectedArgs := []string{"device.remove", "-vm", "validVMPath", "floppy-8000", "-u", credentialUrl}
+			expectedArgs := []string{"device.remove", "-u", credentialUrl, "-vm", "validVMPath", "floppy-8000"}
 			runner.RunReturns(0)
 			runner.RunReturnsOnCall(0, 0)
 			runner.RunReturnsOnCall(1, 0)
@@ -145,7 +145,7 @@ var _ = Describe("VcenterClient", func() {
 		})
 
 		It("returns an error if it was not able to remove ethernet-0 for some reason", func() {
-			expectedArgs := []string{"device.remove", "-vm", "validVMPath", "floppy-8000", "-u", credentialUrl}
+			expectedArgs := []string{"device.remove", "-u", credentialUrl, "-vm", "validVMPath", "floppy-8000"}
 			runner.RunReturnsOnCall(0, 0)
 			runner.RunReturnsOnCall(1, 1)
 			err := vcenterClient.PrepareVM("validVMPath")
@@ -156,6 +156,36 @@ var _ = Describe("VcenterClient", func() {
 			argsForRun := runner.RunArgsForCall(1)
 			Expect(argsForRun).To(Equal(expectedArgs))
 			Expect(err.Error()).To(Equal("floppy-8000 could not be removed/not found"))
+		})
+	})
+	Context("ExportVM", func() {
+		It("exports the VM to local machine from vcenter using vm inventory path", func() {
+			expectedArgs := []string{"export.ovf", "-u", credentialUrl, "-sha", "1", "-vm", "validVMPath", "."}
+			runner.RunReturns(0)
+			err := vcenterClient.ExportVM("validVMPath")
+
+			Expect(err).To(Not(HaveOccurred()))
+			Expect(runner.RunCallCount()).To(Equal(1))
+
+			argsForRun := runner.RunArgsForCall(0)
+			Expect(argsForRun).To(Equal(expectedArgs))
+
+		})
+
+		It("Returns an error message if ExportVM fails to export the VM", func() {
+			vmInventoryPath := "validVMPath"
+			expectedArgs := []string{"export.ovf", "-u", credentialUrl, "-sha", "1", "-vm", vmInventoryPath, "."}
+			runner.RunReturns(1)
+			err := vcenterClient.ExportVM("validVMPath")
+
+			expectedErrorMsg := fmt.Sprintf(vmInventoryPath + " could not be exported")
+			Expect(err).To(HaveOccurred())
+			Expect(runner.RunCallCount()).To(Equal(1))
+
+			argsForRun := runner.RunArgsForCall(0)
+			Expect(argsForRun).To(Equal(expectedArgs))
+			Expect(err.Error()).To(Equal(expectedErrorMsg))
+
 		})
 	})
 })

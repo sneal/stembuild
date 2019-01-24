@@ -13,6 +13,7 @@ type IaasClient interface {
 	ValidateCredentials() error
 	FindVM(vmInventoryPath string) error
 	PrepareVM(vmInventoryPath string) error
+	ExportVM(vmInventoryPath string) error
 }
 
 type VcenterClient struct {
@@ -74,9 +75,18 @@ func (c VcenterClient) PrepareVM(vmInventoryPath string) error {
 }
 
 func (c VcenterClient) removeDevice(vmInventoryPath string, deviceName string) error {
-	errCode := c.Runner.Run([]string{"device.remove", "-vm", vmInventoryPath, deviceName, "-u", c.credentialUrl})
+	errCode := c.Runner.Run([]string{"device.remove", "-u", c.credentialUrl, "-vm", vmInventoryPath, deviceName})
 	if errCode != 0 {
 		errorMsg := fmt.Sprintf(deviceName + " could not be removed/not found")
+		return errors.New(errorMsg)
+	}
+	return nil
+}
+
+func (c VcenterClient) ExportVM(vmInventoryPath string) error {
+	errCode := c.Runner.Run([]string{"export.ovf", "-u", c.credentialUrl, "-sha", "1", "-vm", vmInventoryPath, "."})
+	if errCode != 0 {
+		errorMsg := fmt.Sprintf(vmInventoryPath + " could not be exported")
 		return errors.New(errorMsg)
 	}
 	return nil

@@ -2,6 +2,11 @@ package packagers
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"strings"
 
 	"github.com/cloudfoundry-incubator/stembuild/filesystem"
 
@@ -18,7 +23,7 @@ var _ = Describe("VcenterPackager", func() {
 	var fakeVcenterClient *iaas_clientsfakes.FakeIaasClient
 
 	BeforeEach(func() {
-		sourceConfig = config.SourceConfig{Password: "password", URL: "url", Username: "username", VmInventoryPath: "path"}
+		sourceConfig = config.SourceConfig{Password: "password", URL: "url", Username: "username", VmInventoryPath: "path/valid-vm-name"}
 		fakeVcenterClient = &iaas_clientsfakes.FakeIaasClient{}
 	})
 
@@ -76,17 +81,7 @@ var _ = Describe("VcenterPackager", func() {
 			Expect(err).To(Not(HaveOccurred()))
 		})
 	})
-	Context("Package", func() {
-		It("Prepares the VM by removing the devices successfully", func() {
-			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
-			fakeVcenterClient.PrepareVMReturns(nil)
-			err := packager.Package()
-
-			Expect(err).To(Not(HaveOccurred()))
-			Expect(fakeVcenterClient.PrepareVMCallCount()).To(Equal(1))
-			args := fakeVcenterClient.PrepareVMArgsForCall(0)
-			Expect(args).To(Equal(sourceConfig.VmInventoryPath))
-		})
+	Context("Package failure cases", func() {
 
 		It("Package fails if devices were removed unsuccessfully", func() {
 			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
@@ -98,6 +93,55 @@ var _ = Describe("VcenterPackager", func() {
 			args := fakeVcenterClient.PrepareVMArgsForCall(0)
 			Expect(args).To(Equal(sourceConfig.VmInventoryPath))
 			Expect(err.Error()).To(Equal("could not prepare the VM for export"))
+		})
+
+		It("Returns a error message if exporting the VM fails", func() {
+			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
+			fakeVcenterClient.PrepareVMReturns(nil)
+			fakeVcenterClient.ExportVMReturns(errors.New(fmt.Sprintf(sourceConfig.VmInventoryPath + " could not be exported")))
+			err := packager.Package()
+
+			Expect(err).To(HaveOccurred())
+			Expect(fakeVcenterClient.ExportVMCallCount()).To(Equal(1))
+			args := fakeVcenterClient.ExportVMArgsForCall(0)
+			Expect(args).To(Equal(sourceConfig.VmInventoryPath))
+			Expect(err.Error()).To(Equal("failed to export the prepared VM"))
+		})
+	})
+
+	Context("Package successful case", func() {
+		AfterEach(func() {
+			_ = os.RemoveAll("./valid-vm-name")
+			_ = os.RemoveAll("image")
+		})
+
+		It("exported VM is a tar named image", func() {
+			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
+			fakeVcenterClient.PrepareVMReturns(nil)
+			splitVmInventoryPath := strings.Split(sourceConfig.VmInventoryPath, "/")
+			vmName := splitVmInventoryPath[len(splitVmInventoryPath)-1]
+
+			fakeVcenterClient.ExportVMStub = func(vmInventoryPath string) error {
+
+				err := os.Mkdir(vmName, 0777)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				testOvfName := "valid-vm-name.content"
+				err = ioutil.WriteFile(fmt.Sprintf(vmName+"/"+testOvfName), []byte(""), 0777)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				return nil
+			}
+
+			err := packager.Package()
+
+			Expect(err).To(Not(HaveOccurred()))
+			_, err = os.Stat(fmt.Sprintf("image"))
+
 		})
 	})
 })

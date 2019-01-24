@@ -8,6 +8,17 @@ import (
 )
 
 type FakeIaasClient struct {
+	ExportVMStub        func(string) error
+	exportVMMutex       sync.RWMutex
+	exportVMArgsForCall []struct {
+		arg1 string
+	}
+	exportVMReturns struct {
+		result1 error
+	}
+	exportVMReturnsOnCall map[int]struct {
+		result1 error
+	}
 	FindVMStub        func(string) error
 	findVMMutex       sync.RWMutex
 	findVMArgsForCall []struct {
@@ -52,6 +63,66 @@ type FakeIaasClient struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeIaasClient) ExportVM(arg1 string) error {
+	fake.exportVMMutex.Lock()
+	ret, specificReturn := fake.exportVMReturnsOnCall[len(fake.exportVMArgsForCall)]
+	fake.exportVMArgsForCall = append(fake.exportVMArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	fake.recordInvocation("ExportVM", []interface{}{arg1})
+	fake.exportVMMutex.Unlock()
+	if fake.ExportVMStub != nil {
+		return fake.ExportVMStub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	fakeReturns := fake.exportVMReturns
+	return fakeReturns.result1
+}
+
+func (fake *FakeIaasClient) ExportVMCallCount() int {
+	fake.exportVMMutex.RLock()
+	defer fake.exportVMMutex.RUnlock()
+	return len(fake.exportVMArgsForCall)
+}
+
+func (fake *FakeIaasClient) ExportVMCalls(stub func(string) error) {
+	fake.exportVMMutex.Lock()
+	defer fake.exportVMMutex.Unlock()
+	fake.ExportVMStub = stub
+}
+
+func (fake *FakeIaasClient) ExportVMArgsForCall(i int) string {
+	fake.exportVMMutex.RLock()
+	defer fake.exportVMMutex.RUnlock()
+	argsForCall := fake.exportVMArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeIaasClient) ExportVMReturns(result1 error) {
+	fake.exportVMMutex.Lock()
+	defer fake.exportVMMutex.Unlock()
+	fake.ExportVMStub = nil
+	fake.exportVMReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeIaasClient) ExportVMReturnsOnCall(i int, result1 error) {
+	fake.exportVMMutex.Lock()
+	defer fake.exportVMMutex.Unlock()
+	fake.ExportVMStub = nil
+	if fake.exportVMReturnsOnCall == nil {
+		fake.exportVMReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.exportVMReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
 }
 
 func (fake *FakeIaasClient) FindVM(arg1 string) error {
@@ -281,6 +352,8 @@ func (fake *FakeIaasClient) ValidateUrlReturnsOnCall(i int, result1 error) {
 func (fake *FakeIaasClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
+	fake.exportVMMutex.RLock()
+	defer fake.exportVMMutex.RUnlock()
 	fake.findVMMutex.RLock()
 	defer fake.findVMMutex.RUnlock()
 	fake.prepareVMMutex.RLock()
