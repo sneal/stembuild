@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
+	"path/filepath"
 
 	"github.com/cloudfoundry-incubator/stembuild/filesystem"
 
@@ -14,6 +14,7 @@ import (
 
 type VCenterPackager struct {
 	SourceConfig config.SourceConfig
+	OutputConfig config.OutputConfig
 	Client       iaas_clients.IaasClient
 }
 
@@ -27,10 +28,13 @@ func (v VCenterPackager) Package() error {
 		return errors.New("failed to export the prepared VM")
 	}
 
-	splitVmInventoryPath := strings.Split(v.SourceConfig.VmInventoryPath, "/")
-	vmName := splitVmInventoryPath[len(splitVmInventoryPath)-1]
-
-	_, err = TarGenerator("image", vmName)
+	vmName := filepath.Base(v.SourceConfig.VmInventoryPath)
+	shaSum, err := TarGenerator("image", vmName)
+	manifestContents := CreateManifest(v.OutputConfig.Os, v.OutputConfig.StemcellVersion, shaSum)
+	err = WriteManifest(manifestContents, v.OutputConfig.OutputDir)
+	if err != nil {
+		return errors.New("failed to create stemcell.MF file")
+	}
 
 	return nil
 }

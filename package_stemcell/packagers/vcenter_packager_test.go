@@ -1,11 +1,15 @@
 package packagers
 
 import (
+	"archive/tar"
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/cloudfoundry-incubator/stembuild/filesystem"
@@ -19,12 +23,20 @@ import (
 
 var _ = Describe("VcenterPackager", func() {
 
+	var outputDir string
 	var sourceConfig config.SourceConfig
+	var outputConfig config.OutputConfig
 	var fakeVcenterClient *iaas_clientsfakes.FakeIaasClient
 
 	BeforeEach(func() {
+		outputDir, _ = ioutil.TempDir(os.TempDir(), "vcenter-test-output-dir")
 		sourceConfig = config.SourceConfig{Password: "password", URL: "url", Username: "username", VmInventoryPath: "path/valid-vm-name"}
+		outputConfig = config.OutputConfig{Os: "2012R2", StemcellVersion: "1200.2", OutputDir: outputDir}
 		fakeVcenterClient = &iaas_clientsfakes.FakeIaasClient{}
+	})
+
+	AfterEach(func() {
+		_ = os.RemoveAll(outputDir)
 	})
 
 	Context("ValidateSourceParameters", func() {
@@ -32,7 +44,7 @@ var _ = Describe("VcenterPackager", func() {
 
 			fakeVcenterClient.ValidateUrlReturns(errors.New("invalid url"))
 
-			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
+			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 			err := packager.ValidateSourceParameters()
 
 			Expect(err).To(HaveOccurred())
@@ -44,7 +56,7 @@ var _ = Describe("VcenterPackager", func() {
 
 			fakeVcenterClient.ValidateCredentialsReturns(errors.New("invalid credentials"))
 
-			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
+			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 
 			err := packager.ValidateSourceParameters()
 
@@ -56,7 +68,7 @@ var _ = Describe("VcenterPackager", func() {
 		It("returns an error if VM given does not exist ", func() {
 			fakeVcenterClient.FindVMReturns(errors.New("invalid VM path"))
 
-			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
+			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 
 			err := packager.ValidateSourceParameters()
 
@@ -66,7 +78,7 @@ var _ = Describe("VcenterPackager", func() {
 		})
 		It("returns no error if all source parameters are valid", func() {
 
-			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
+			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 
 			err := packager.ValidateSourceParameters()
 
@@ -75,7 +87,7 @@ var _ = Describe("VcenterPackager", func() {
 	})
 	Context("ValidateFreeSpace", func() {
 		It("Print a warning to make sure that enough space is available", func() {
-			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
+			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 			err := packager.ValidateFreeSpaceForPackage(&filesystem.OSFileSystem{})
 
 			Expect(err).To(Not(HaveOccurred()))
@@ -84,7 +96,7 @@ var _ = Describe("VcenterPackager", func() {
 	Context("Package failure cases", func() {
 
 		It("Package fails if devices were removed unsuccessfully", func() {
-			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
+			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 			fakeVcenterClient.PrepareVMReturns(errors.New("floppy-8000 could not be removed/not found"))
 			err := packager.Package()
 
@@ -96,7 +108,7 @@ var _ = Describe("VcenterPackager", func() {
 		})
 
 		It("Returns a error message if exporting the VM fails", func() {
-			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
+			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 			fakeVcenterClient.PrepareVMReturns(nil)
 			fakeVcenterClient.ExportVMReturns(errors.New(fmt.Sprintf(sourceConfig.VmInventoryPath + " could not be exported")))
 			err := packager.Package()
@@ -116,10 +128,14 @@ var _ = Describe("VcenterPackager", func() {
 		})
 
 		It("exported VM is a tar named image", func() {
-			packager := VCenterPackager{SourceConfig: sourceConfig, Client: fakeVcenterClient}
+			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 			fakeVcenterClient.PrepareVMReturns(nil)
 			splitVmInventoryPath := strings.Split(sourceConfig.VmInventoryPath, "/")
 			vmName := splitVmInventoryPath[len(splitVmInventoryPath)-1]
+
+			fileContentMap := make(map[string]string)
+			fileContentMap["stemcell.MF"] = "file1 content\n"
+			fileContentMap["image"] = "file2 content\n"
 
 			fakeVcenterClient.ExportVMStub = func(vmInventoryPath string) error {
 
@@ -133,14 +149,63 @@ var _ = Describe("VcenterPackager", func() {
 				if err != nil {
 					log.Fatal(err)
 				}
-
 				return nil
 			}
 
 			err := packager.Package()
 
 			Expect(err).To(Not(HaveOccurred()))
-			_, err = os.Stat(fmt.Sprintf("image"))
+			//We don't know what the end-stemcell is going to be named
+			stemcellName := fmt.Sprintf(vmName + ".tgz")
+			_, err = os.Stat(stemcellName)
+
+			Expect(err).NotTo(HaveOccurred())
+			expectedManifestContent := `---
+name: bosh-vsphere-esxi-windows2012R2-go_agent
+version: '1200.2'
+sha1: sha1sum
+operating_system: windows1
+cloud_properties:
+  infrastructure: vsphere
+  hypervisor: esxi
+stemcell_formats:
+- vsphere-ovf
+- vsphere-ova
+`
+			var fileReader, _ = os.OpenFile(stemcellName, os.O_RDONLY, 0777)
+
+			tarfileReader := tar.NewReader(fileReader)
+			count := 0
+
+			for {
+				header, err := tarfileReader.Next()
+				if err == io.EOF {
+					break
+				}
+
+				Expect(err).NotTo(HaveOccurred())
+
+				switch filepath.Base(header.Name) {
+				case "stemcell.MF":
+					buf := new(bytes.Buffer)
+					_, err = buf.ReadFrom(tarfileReader)
+					if err != nil {
+						break
+					}
+					count++
+
+					stemcellManifestContent := buf.String()
+					Expect(stemcellManifestContent).To(Equal(expectedManifestContent))
+
+				case "image":
+					count++
+
+				default:
+
+					Fail(fmt.Sprintf("Found unknown file: %s", filepath.Base(header.Name)))
+				}
+			}
+			Expect(count).To(Equal(2))
 
 		})
 	})
