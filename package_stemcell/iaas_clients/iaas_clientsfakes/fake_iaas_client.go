@@ -2,16 +2,17 @@
 package iaas_clientsfakes
 
 import (
-	sync "sync"
+	"sync"
 
-	iaas_clients "github.com/cloudfoundry-incubator/stembuild/package_stemcell/iaas_clients"
+	"github.com/cloudfoundry-incubator/stembuild/package_stemcell/iaas_clients"
 )
 
 type FakeIaasClient struct {
-	ExportVMStub        func(string) error
+	ExportVMStub        func(string, string) error
 	exportVMMutex       sync.RWMutex
 	exportVMArgsForCall []struct {
 		arg1 string
+		arg2 string
 	}
 	exportVMReturns struct {
 		result1 error
@@ -65,16 +66,17 @@ type FakeIaasClient struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeIaasClient) ExportVM(arg1 string) error {
+func (fake *FakeIaasClient) ExportVM(arg1 string, arg2 string) error {
 	fake.exportVMMutex.Lock()
 	ret, specificReturn := fake.exportVMReturnsOnCall[len(fake.exportVMArgsForCall)]
 	fake.exportVMArgsForCall = append(fake.exportVMArgsForCall, struct {
 		arg1 string
-	}{arg1})
-	fake.recordInvocation("ExportVM", []interface{}{arg1})
+		arg2 string
+	}{arg1, arg2})
+	fake.recordInvocation("ExportVM", []interface{}{arg1, arg2})
 	fake.exportVMMutex.Unlock()
 	if fake.ExportVMStub != nil {
-		return fake.ExportVMStub(arg1)
+		return fake.ExportVMStub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1
@@ -89,17 +91,17 @@ func (fake *FakeIaasClient) ExportVMCallCount() int {
 	return len(fake.exportVMArgsForCall)
 }
 
-func (fake *FakeIaasClient) ExportVMCalls(stub func(string) error) {
+func (fake *FakeIaasClient) ExportVMCalls(stub func(string, string) error) {
 	fake.exportVMMutex.Lock()
 	defer fake.exportVMMutex.Unlock()
 	fake.ExportVMStub = stub
 }
 
-func (fake *FakeIaasClient) ExportVMArgsForCall(i int) string {
+func (fake *FakeIaasClient) ExportVMArgsForCall(i int) (string, string) {
 	fake.exportVMMutex.RLock()
 	defer fake.exportVMMutex.RUnlock()
 	argsForCall := fake.exportVMArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeIaasClient) ExportVMReturns(result1 error) {

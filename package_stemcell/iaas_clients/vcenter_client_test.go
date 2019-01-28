@@ -2,6 +2,8 @@ package iaas_clients
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 
 	"github.com/cloudfoundry-incubator/stembuild/iaas_cli/iaas_clifakes"
 	. "github.com/onsi/ginkgo"
@@ -159,24 +161,27 @@ var _ = Describe("VcenterClient", func() {
 		})
 	})
 	Context("ExportVM", func() {
+		var destinationDir string
+		BeforeEach(func() {
+			destinationDir, _ = ioutil.TempDir(os.TempDir(), "destinationDir")
+		})
 		It("exports the VM to local machine from vcenter using vm inventory path", func() {
-			expectedArgs := []string{"export.ovf", "-u", credentialUrl, "-sha", "1", "-vm", "validVMPath", "."}
+			expectedArgs := []string{"export.ovf", "-u", credentialUrl, "-sha", "1", "-vm", "validVMPath", destinationDir}
 			runner.RunReturns(0)
-			err := vcenterClient.ExportVM("validVMPath")
+			err := vcenterClient.ExportVM("validVMPath", destinationDir)
 
 			Expect(err).To(Not(HaveOccurred()))
 			Expect(runner.RunCallCount()).To(Equal(1))
 
 			argsForRun := runner.RunArgsForCall(0)
 			Expect(argsForRun).To(Equal(expectedArgs))
-
 		})
 
 		It("Returns an error message if ExportVM fails to export the VM", func() {
 			vmInventoryPath := "validVMPath"
-			expectedArgs := []string{"export.ovf", "-u", credentialUrl, "-sha", "1", "-vm", vmInventoryPath, "."}
+			expectedArgs := []string{"export.ovf", "-u", credentialUrl, "-sha", "1", "-vm", vmInventoryPath, destinationDir}
 			runner.RunReturns(1)
-			err := vcenterClient.ExportVM("validVMPath")
+			err := vcenterClient.ExportVM("validVMPath", destinationDir)
 
 			expectedErrorMsg := fmt.Sprintf(vmInventoryPath + " could not be exported")
 			Expect(err).To(HaveOccurred())
@@ -185,7 +190,13 @@ var _ = Describe("VcenterClient", func() {
 			argsForRun := runner.RunArgsForCall(0)
 			Expect(argsForRun).To(Equal(expectedArgs))
 			Expect(err.Error()).To(Equal(expectedErrorMsg))
+		})
 
+		It("prints an appropriate error message if the given directory doesn't exist", func() {
+			err := vcenterClient.ExportVM("validVMPath", "/FooBar/stuff")
+			Expect(err).To(HaveOccurred())
+
+			Expect(err.Error()).To(Equal("provided destination: /FooBar/stuff does not exist"))
 		})
 	})
 })

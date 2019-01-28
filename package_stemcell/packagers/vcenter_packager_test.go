@@ -6,14 +6,12 @@ import (
 	"crypto/sha1"
 	"errors"
 	"fmt"
+	"github.com/cloudfoundry-incubator/stembuild/filesystem"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
-
-	"github.com/cloudfoundry-incubator/stembuild/filesystem"
 
 	"github.com/cloudfoundry-incubator/stembuild/package_stemcell/iaas_clients/iaas_clientsfakes"
 
@@ -116,8 +114,8 @@ var _ = Describe("VcenterPackager", func() {
 
 			Expect(err).To(HaveOccurred())
 			Expect(fakeVcenterClient.ExportVMCallCount()).To(Equal(1))
-			args := fakeVcenterClient.ExportVMArgsForCall(0)
-			Expect(args).To(Equal(sourceConfig.VmInventoryPath))
+			vmPath, _ := fakeVcenterClient.ExportVMArgsForCall(0)
+			Expect(vmPath).To(Equal(sourceConfig.VmInventoryPath))
 			Expect(err.Error()).To(Equal("failed to export the prepared VM"))
 		})
 	})
@@ -131,22 +129,13 @@ var _ = Describe("VcenterPackager", func() {
 		It("creates a valid stemcell in the output directory", func() {
 			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 			fakeVcenterClient.PrepareVMReturns(nil)
-			splitVmInventoryPath := strings.Split(sourceConfig.VmInventoryPath, "/")
-			vmName := splitVmInventoryPath[len(splitVmInventoryPath)-1]
-
 			fileContentMap := make(map[string]string)
 			fileContentMap["stemcell.MF"] = "file1 content\n"
 			fileContentMap["image"] = "file2 content\n"
 
-			fakeVcenterClient.ExportVMStub = func(vmInventoryPath string) error {
-
-				err := os.Mkdir(vmName, 0777)
-				if err != nil {
-					log.Fatal(err)
-				}
-
+			fakeVcenterClient.ExportVMStub = func(vmInventoryPath string, destination string) error {
 				testOvfName := "valid-vm-name.content"
-				err = ioutil.WriteFile(fmt.Sprintf(vmName+"/"+testOvfName), []byte(""), 0777)
+				err := ioutil.WriteFile(filepath.Join(destination, testOvfName), []byte(""), 0777)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -201,7 +190,7 @@ stemcell_formats:
 				case "image":
 					count++
 
-					imageFile, _ := os.Open(filepath.Join(packager.OutputConfig.OutputDir, "image"))
+					imageFile, _ := os.Open(header.Name)
 					defer imageFile.Close()
 					actualSha1 := sha1.New()
 					io.Copy(actualSha1, imageFile)

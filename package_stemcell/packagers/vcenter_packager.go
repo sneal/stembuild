@@ -3,6 +3,7 @@ package packagers
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -23,21 +24,31 @@ func (v VCenterPackager) Package() error {
 	if err != nil {
 		return errors.New("could not prepare the VM for export")
 	}
-	err = v.Client.ExportVM(v.SourceConfig.VmInventoryPath)
+	workingDir, err := ioutil.TempDir(os.TempDir(), "vcenter-packager-working-directory")
+
+	if err != nil {
+		return errors.New("failed to create working directory")
+	}
+
+	stemcellDir, err := ioutil.TempDir(os.TempDir(), "vcenter-packager-stemcell-directory")
+	if err != nil {
+		return errors.New("failed to create stemcell directory")
+	}
+
+	err = v.Client.ExportVM(v.SourceConfig.VmInventoryPath, workingDir)
 	if err != nil {
 		return errors.New("failed to export the prepared VM")
 	}
 
-	vmName := filepath.Base(v.SourceConfig.VmInventoryPath)
-	shaSum, err := TarGenerator(filepath.Join(v.OutputConfig.OutputDir, "image"), vmName)
+	shaSum, err := TarGenerator(filepath.Join(stemcellDir, "image"), workingDir)
 	manifestContents := CreateManifest(v.OutputConfig.Os, v.OutputConfig.StemcellVersion, shaSum)
-	err = WriteManifest(manifestContents, v.OutputConfig.OutputDir)
+	err = WriteManifest(manifestContents, stemcellDir)
 	if err != nil {
 		return errors.New("failed to create stemcell.MF file")
 	}
 
 	stemcellFilename := StemcellFilename(v.OutputConfig.StemcellVersion, v.OutputConfig.Os)
-	_, err = TarGenerator(filepath.Join(v.OutputConfig.OutputDir, stemcellFilename), v.OutputConfig.OutputDir)
+	_, err = TarGenerator(filepath.Join(v.OutputConfig.OutputDir, stemcellFilename), stemcellDir)
 
 	return nil
 }

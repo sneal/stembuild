@@ -3,6 +3,7 @@ package iaas_clients
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/cloudfoundry-incubator/stembuild/iaas_cli"
 )
@@ -13,7 +14,7 @@ type IaasClient interface {
 	ValidateCredentials() error
 	FindVM(vmInventoryPath string) error
 	PrepareVM(vmInventoryPath string) error
-	ExportVM(vmInventoryPath string) error
+	ExportVM(vmInventoryPath string, destination string) error
 }
 
 type VcenterClient struct {
@@ -83,8 +84,12 @@ func (c VcenterClient) removeDevice(vmInventoryPath string, deviceName string) e
 	return nil
 }
 
-func (c VcenterClient) ExportVM(vmInventoryPath string) error {
-	errCode := c.Runner.Run([]string{"export.ovf", "-u", c.credentialUrl, "-sha", "1", "-vm", vmInventoryPath, "."})
+func (c VcenterClient) ExportVM(vmInventoryPath string, destination string) error {
+	_, err := os.Stat(destination)
+	if err != nil {
+		return errors.New(fmt.Sprintf("provided destination: %s does not exist", destination))
+	}
+	errCode := c.Runner.Run([]string{"export.ovf", "-u", c.credentialUrl, "-sha", "1", "-vm", vmInventoryPath, destination})
 	if errCode != 0 {
 		errorMsg := fmt.Sprintf(vmInventoryPath + " could not be exported")
 		return errors.New(errorMsg)
