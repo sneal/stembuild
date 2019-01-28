@@ -3,6 +3,7 @@ package packagers
 import (
 	"archive/tar"
 	"bytes"
+	"crypto/sha1"
 	"errors"
 	"fmt"
 	"io"
@@ -127,7 +128,7 @@ var _ = Describe("VcenterPackager", func() {
 			_ = os.RemoveAll("image")
 		})
 
-		It("exported VM is a tar named image", func() {
+		It("creates a valid stemcell in the output directory", func() {
 			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 			fakeVcenterClient.PrepareVMReturns(nil)
 			splitVmInventoryPath := strings.Split(sourceConfig.VmInventoryPath, "/")
@@ -155,16 +156,17 @@ var _ = Describe("VcenterPackager", func() {
 			err := packager.Package()
 
 			Expect(err).To(Not(HaveOccurred()))
-			//We don't know what the end-stemcell is going to be named
-			stemcellName := fmt.Sprintf(vmName + ".tgz")
+			stemcellFilename := StemcellFilename(packager.OutputConfig.StemcellVersion, packager.OutputConfig.Os)
+			stemcellName := filepath.Join(packager.OutputConfig.OutputDir, stemcellFilename)
 			_, err = os.Stat(stemcellName)
 
 			Expect(err).NotTo(HaveOccurred())
+			var actualStemcellManifestContent string
 			expectedManifestContent := `---
 name: bosh-vsphere-esxi-windows2012R2-go_agent
 version: '1200.2'
-sha1: sha1sum
-operating_system: windows1
+sha1: %x
+operating_system: windows2012R2
 cloud_properties:
   infrastructure: vsphere
   hypervisor: esxi
@@ -194,11 +196,17 @@ stemcell_formats:
 					}
 					count++
 
-					stemcellManifestContent := buf.String()
-					Expect(stemcellManifestContent).To(Equal(expectedManifestContent))
+					actualStemcellManifestContent = buf.String()
 
 				case "image":
 					count++
+
+					imageFile, _ := os.Open(filepath.Join(packager.OutputConfig.OutputDir, "image"))
+					defer imageFile.Close()
+					actualSha1 := sha1.New()
+					io.Copy(actualSha1, imageFile)
+
+					expectedManifestContent = fmt.Sprintf(expectedManifestContent, actualSha1.Sum(nil))
 
 				default:
 
@@ -206,7 +214,7 @@ stemcell_formats:
 				}
 			}
 			Expect(count).To(Equal(2))
-
+			Expect(actualStemcellManifestContent).To(Equal(expectedManifestContent))
 		})
 	})
 })

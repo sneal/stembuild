@@ -106,3 +106,8 @@ func TarGenerator(destinationfileName string, sourceDirName string) (string, err
 
 	return fmt.Sprintf("%x", sha1Hash.Sum(nil)), nil
 }
+
+func StemcellFilename(version, os string) string {
+	return fmt.Sprintf("bosh-stemcell-%s-vsphere-esxi-windows%s-go_agent.tgz",
+		version, os)
+}

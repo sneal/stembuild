@@ -29,12 +29,15 @@ func (v VCenterPackager) Package() error {
 	}
 
 	vmName := filepath.Base(v.SourceConfig.VmInventoryPath)
-	shaSum, err := TarGenerator("image", vmName)
+	shaSum, err := TarGenerator(filepath.Join(v.OutputConfig.OutputDir, "image"), vmName)
 	manifestContents := CreateManifest(v.OutputConfig.Os, v.OutputConfig.StemcellVersion, shaSum)
 	err = WriteManifest(manifestContents, v.OutputConfig.OutputDir)
 	if err != nil {
 		return errors.New("failed to create stemcell.MF file")
 	}
+
+	stemcellFilename := StemcellFilename(v.OutputConfig.StemcellVersion, v.OutputConfig.Os)
+	_, err = TarGenerator(filepath.Join(v.OutputConfig.OutputDir, stemcellFilename), v.OutputConfig.OutputDir)
 
 	return nil
 }

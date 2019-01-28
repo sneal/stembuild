@@ -139,11 +139,6 @@ func (c *VmdkPackager) AddTarFile(tr *tar.Writer, name string) error {
 	return nil
 }
 
-func StemcellFilename(version, os string) string {
-	return fmt.Sprintf("bosh-stemcell-%s-vsphere-esxi-windows%s-go_agent.tgz",
-		version, os)
-}
-
 func (c *VmdkPackager) TempDir() (string, error) {
 	if c.tmpdir != "" {
 		if _, err := os.Stat(c.tmpdir); err != nil {

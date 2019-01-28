@@ -37,8 +37,6 @@ var _ = Describe("Packager Utility", func() {
 
 			sha1Sum, err := TarGenerator(tarball, sourceDir)
 
-			expectedSha1 := sha1.New()
-
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = os.Stat(tarball)
@@ -65,7 +63,7 @@ var _ = Describe("Packager Utility", func() {
 
 			tarballFile, err := os.Open(tarball)
 			defer tarballFile.Close()
-
+			expectedSha1 := sha1.New()
 			io.Copy(expectedSha1, tarballFile)
 
 			sum := fmt.Sprintf("%x", expectedSha1.Sum(nil))
@@ -94,6 +92,13 @@ stemcell_formats:
 `
 			result := CreateManifest("1", "version", "sha1sum")
 			Expect(result).To(Equal(expectedManifest))
+		})
+	})
+
+	Context("StemcellFileName", func() {
+		It("formats a file name appropriately", func() {
+			expectedName := "bosh-stemcell-1200.1-vsphere-esxi-windows2012R2-go_agent.tgz"
+			Expect(StemcellFilename("1200.1", "2012R2")).To(Equal(expectedName))
 		})
 	})
 })
