@@ -274,6 +274,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:c2e5efe34da77eee498fbb1cb19d0b7c05ed2e2f88e9e5ca873a0b7fdaf38a46"
+  name = "golang.org/x/build"
+  packages = ["internal/untar"]
+  pruneopts = "UT"
+  revision = "e9fe3dc8933d29df76a8b52bac5e62c41b42ab6d"
+
+[[projects]]
+  branch = "master"
   digest = "1:7d80d5561efbfcfdc3e4720bf5e331d574fd6f1e531b115ecf568aab3e2b656d"
   name = "golang.org/x/crypto"
   packages = ["md4"]
@@ -363,6 +371,7 @@
     "github.com/vmware/govmomi/govc/object",
     "github.com/vmware/govmomi/govc/vm",
     "github.com/xtreme-gabelan-satchithanantham/winrmcp/winrmcp",
+    "golang.org/x/build/internal/untar",
     "golang.org/x/sys/windows/registry",
   ]
   solver-name = "gps-cdcl"

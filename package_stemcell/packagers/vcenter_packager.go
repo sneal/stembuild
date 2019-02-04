@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/cloudfoundry-incubator/stembuild/filesystem"
@@ -20,6 +21,8 @@ type VCenterPackager struct {
 }
 
 func (v VCenterPackager) Package() error {
+	fmt.Println(fmt.Sprintf("OS: %s", v.OutputConfig.Os))
+	fmt.Println(fmt.Sprintf("Version: %s", v.OutputConfig.StemcellVersion))
 	err := v.Client.PrepareVM(v.SourceConfig.VmInventoryPath)
 	if err != nil {
 		return errors.New("could not prepare the VM for export")
@@ -30,19 +33,35 @@ func (v VCenterPackager) Package() error {
 		return errors.New("failed to create working directory")
 	}
 
+	fmt.Println(fmt.Sprintf("working directory: %s", workingDir))
 	stemcellDir, err := ioutil.TempDir(os.TempDir(), "vcenter-packager-stemcell-directory")
 	if err != nil {
 		return errors.New("failed to create stemcell directory")
 	}
-
+	fmt.Println(fmt.Sprintf("stemcell directory: %s", stemcellDir))
 	err = v.Client.ExportVM(v.SourceConfig.VmInventoryPath, workingDir)
+
+	files, _ := ioutil.ReadDir(workingDir)
+
+	for _, f := range files {
+		fmt.Println(fmt.Sprintf("working dir file: %s", f.Name()))
+	}
+
 	if err != nil {
 		return errors.New("failed to export the prepared VM")
 	}
 
-	shaSum, err := TarGenerator(filepath.Join(stemcellDir, "image"), workingDir)
+	vmName := path.Base(v.SourceConfig.VmInventoryPath)
+	shaSum, err := TarGenerator(filepath.Join(stemcellDir, "image"), filepath.Join(workingDir, vmName))
 	manifestContents := CreateManifest(v.OutputConfig.Os, v.OutputConfig.StemcellVersion, shaSum)
 	err = WriteManifest(manifestContents, stemcellDir)
+
+	files, _ = ioutil.ReadDir(stemcellDir)
+
+	for _, f := range files {
+		fmt.Println(fmt.Sprintf("stemcell dir file: %s", f.Name()))
+	}
+
 	if err != nil {
 		return errors.New("failed to create stemcell.MF file")
 	}

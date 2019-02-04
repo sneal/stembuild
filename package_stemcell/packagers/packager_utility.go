@@ -82,7 +82,7 @@ func TarGenerator(destinationfileName string, sourceDirName string) (string, err
 
 		// prepare the tar header
 		header := new(tar.Header)
-		header.Name = file.Name()
+		header.Name = fileInfo.Name()
 		header.Size = fileInfo.Size()
 		header.Mode = int64(fileInfo.Mode())
 		header.ModTime = fileInfo.ModTime()

@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/cloudfoundry-incubator/stembuild/package_stemcell/iaas_clients/iaas_clientsfakes"
@@ -134,8 +135,11 @@ var _ = Describe("VcenterPackager", func() {
 			fileContentMap["image"] = "file2 content\n"
 
 			fakeVcenterClient.ExportVMStub = func(vmInventoryPath string, destination string) error {
+				vmName := path.Base(vmInventoryPath)
+				os.Mkdir(filepath.Join(destination, vmName), 0777)
+
 				testOvfName := "valid-vm-name.content"
-				err := ioutil.WriteFile(filepath.Join(destination, testOvfName), []byte(""), 0777)
+				err := ioutil.WriteFile(filepath.Join(filepath.Join(destination, vmName), testOvfName), []byte(""), 0777)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -146,8 +150,8 @@ var _ = Describe("VcenterPackager", func() {
 
 			Expect(err).To(Not(HaveOccurred()))
 			stemcellFilename := StemcellFilename(packager.OutputConfig.StemcellVersion, packager.OutputConfig.Os)
-			stemcellName := filepath.Join(packager.OutputConfig.OutputDir, stemcellFilename)
-			_, err = os.Stat(stemcellName)
+			stemcellFile := filepath.Join(packager.OutputConfig.OutputDir, stemcellFilename)
+			_, err = os.Stat(stemcellFile)
 
 			Expect(err).NotTo(HaveOccurred())
 			var actualStemcellManifestContent string
@@ -163,7 +167,7 @@ stemcell_formats:
 - vsphere-ovf
 - vsphere-ova
 `
-			var fileReader, _ = os.OpenFile(stemcellName, os.O_RDONLY, 0777)
+			var fileReader, _ = os.OpenFile(stemcellFile, os.O_RDONLY, 0777)
 
 			tarfileReader := tar.NewReader(fileReader)
 			count := 0
@@ -180,20 +184,15 @@ stemcell_formats:
 				case "stemcell.MF":
 					buf := new(bytes.Buffer)
 					_, err = buf.ReadFrom(tarfileReader)
-					if err != nil {
-						break
-					}
+					Expect(err).NotTo(HaveOccurred())
 					count++
 
 					actualStemcellManifestContent = buf.String()
 
 				case "image":
 					count++
-
-					imageFile, _ := os.Open(header.Name)
-					defer imageFile.Close()
 					actualSha1 := sha1.New()
-					io.Copy(actualSha1, imageFile)
+					io.Copy(actualSha1, tarfileReader)
 
 					expectedManifestContent = fmt.Sprintf(expectedManifestContent, actualSha1.Sum(nil))
 
