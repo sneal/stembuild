@@ -3,6 +3,7 @@ package packagers
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"crypto/sha1"
 	"errors"
 	"fmt"
@@ -168,8 +169,10 @@ stemcell_formats:
 - vsphere-ova
 `
 			var fileReader, _ = os.OpenFile(stemcellFile, os.O_RDONLY, 0777)
-
-			tarfileReader := tar.NewReader(fileReader)
+			gzr, err := gzip.NewReader(fileReader)
+			Expect(err).ToNot(HaveOccurred())
+			defer gzr.Close()
+			tarfileReader := tar.NewReader(gzr)
 			count := 0
 
 			for {

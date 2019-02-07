@@ -3,6 +3,7 @@ package packagers
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"crypto/sha1"
 	"fmt"
 	"io"
@@ -43,7 +44,10 @@ var _ bool = Describe("Packager Utility", func() {
 			Expect(err).NotTo(HaveOccurred())
 			var fileReader, _ = os.OpenFile(tarball, os.O_RDONLY, 0777)
 
-			tarfileReader := tar.NewReader(fileReader)
+			gzr, err := gzip.NewReader(fileReader)
+			Expect(err).ToNot(HaveOccurred())
+			defer gzr.Close()
+			tarfileReader := tar.NewReader(gzr)
 			count := 0
 			for {
 				header, err := tarfileReader.Next()
@@ -70,7 +74,7 @@ var _ bool = Describe("Packager Utility", func() {
 			Expect(sha1Sum).To(Equal(sum))
 		})
 
-		FIt("tarball test", func() {
+		It("tarball test", func() {
 			err := ioutil.WriteFile(filepath.Join(sourceDir, "file1"), []byte("file1 content\n"), 0777)
 			file, err := os.Open(filepath.Join(sourceDir, "file1"))
 			Expect(err).NotTo(HaveOccurred())
@@ -90,7 +94,10 @@ var _ bool = Describe("Packager Utility", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			fileReader, err := os.OpenFile(anotherTarball, os.O_RDONLY, 0777)
-			stemcellReader := tar.NewReader(fileReader)
+			gzr, err := gzip.NewReader(fileReader)
+			Expect(err).ToNot(HaveOccurred())
+			defer gzr.Close()
+			stemcellReader := tar.NewReader(gzr)
 			defer fileReader.Close()
 			h := sha1.New()
 
@@ -108,7 +115,10 @@ var _ bool = Describe("Packager Utility", func() {
 			}
 
 			fileReader, err = os.OpenFile(filepath.Join(anotherDestination, "untarFile"), os.O_RDONLY, 0777)
-			stemcellReader = tar.NewReader(fileReader)
+			gzr, err = gzip.NewReader(fileReader)
+			Expect(err).ToNot(HaveOccurred())
+			defer gzr.Close()
+			stemcellReader = tar.NewReader(gzr)
 			defer fileReader.Close()
 			for {
 				header, err := stemcellReader.Next()

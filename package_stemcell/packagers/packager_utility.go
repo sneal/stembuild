@@ -2,6 +2,7 @@ package packagers
 
 import (
 	"archive/tar"
+	"compress/gzip"
 	"crypto/sha1"
 	"errors"
 	"fmt"
@@ -66,7 +67,8 @@ func TarGenerator(destinationfileName string, sourceDirName string) (string, err
 	defer destinationFile.Close()
 
 	sha1Hash := sha1.New()
-	tarfileWriter := tar.NewWriter(io.MultiWriter(destinationFile, sha1Hash))
+	gzw := gzip.NewWriter(io.MultiWriter(destinationFile, sha1Hash))
+	tarfileWriter := tar.NewWriter(gzw)
 
 	for _, fileInfo := range files {
 
@@ -99,6 +101,10 @@ func TarGenerator(destinationfileName string, sourceDirName string) (string, err
 	}
 
 	//Shouldn't be a deferred call as closing the tar writer flushes padding and writes footer which impacts the sha1sum
+	err = gzw.Close()
+	if err != nil {
+		return "", errors.New("unable to close tar file (gzip)")
+	}
 	err = tarfileWriter.Close()
 	if err != nil {
 		return "", errors.New("unable to close tar file")
