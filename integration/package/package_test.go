@@ -2,6 +2,7 @@ package package_test
 
 import (
 	"archive/tar"
+	"compress/gzip"
 	"crypto/sha1"
 	"fmt"
 	"io"
@@ -26,12 +27,9 @@ import (
 
 var _ = Describe("Package", func() {
 	const (
-		baseVMName      = "stembuild-package-test-source-base"
+		baseVMName      = "stembuild-package-tests-base-vm"
 		stemcellVersion = "1803.5.3999-manual.1"
 		osVersion       = "1803"
-
-		expectedStemcellShaSum = "b811888f55e81eb3bee2c68c4ed2986f6b2825ba"
-
 		vcenterURLVariable      = "GOVC_URL"
 		vcenterUsernameVariable = "GOVC_USERNAME"
 		vcenterPasswordVariable = "GOVC_PASSWORD"
@@ -45,17 +43,17 @@ var _ = Describe("Package", func() {
 		vmPath       string
 	)
 
-	FIt("generates a stemcell with the correct shasum", func() {
+	It("generates a stemcell with the correct shasum", func() {
 		existingVM := os.Getenv(existingVMVariable)
 		vcenterFolder := helpers.EnvMustExist(vcenterFolderVariable)
 
 		rand.Seed(time.Now().UnixNano())
 		if existingVM == "" {
-			sourceVMName = "stembuild-package-test-1445168366415952161"//fmt.Sprintf("stembuild-package-test-1445168366415952161", rand.Int())
+			sourceVMName = "stembuild-package-test-1445168366415952161" //fmt.Sprintf("stembuild-package-test-1445168366415952161", rand.Int())
 		} else {
 			sourceVMName = fmt.Sprintf("%s-%d", existingVM, rand.Int())
 		}
-		println(sourceVMName)
+		
 		baseVMWithPath := fmt.Sprintf(vcenterFolder + "/" + baseVMName)
 		vmPath = strings.Join([]string{vcenterFolder, sourceVMName}, "/")
 		cli.Run([]string{"vm.clone", "-vm", baseVMWithPath, "-on=false", sourceVMName})
@@ -68,13 +66,9 @@ var _ = Describe("Package", func() {
 		vcenterPassword := helpers.EnvMustExist(vcenterPasswordVariable)
 
 		workingDir, err = ioutil.TempDir(os.TempDir(), "stembuild-package-test")
-		fmt.Printf("test working directory: %s\n", workingDir)
-		dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println(dir)
-		fmt.Println("--------------------------------------------------------------")
 
 		Expect(err).NotTo(HaveOccurred())
 
@@ -96,49 +90,74 @@ var _ = Describe("Package", func() {
 			"bosh-stemcell-%s-vsphere-esxi-windows%s-go_agent.tgz",
 			stemcellVersion, osVersion,
 		)
-		fp := filepath.Join(workingDir, expectedFilename)
+		stemcellPath := filepath.Join(workingDir, expectedFilename)
 
-		f, err := os.OpenFile(fp, os.O_RDONLY, 0777)
+		stemcellZip, err := os.OpenFile(stemcellPath, os.O_RDONLY, 0777)
 		Expect(err).NotTo(HaveOccurred())
 
-		r := tar.NewReader(f)
+		gzr, err := gzip.NewReader(stemcellZip)
+		Expect(err).ToNot(HaveOccurred())
+		defer gzr.Close()
+
+		var imageZip *os.File
+		r := tar.NewReader(gzr)
 		for {
 			header, err := r.Next()
 			if err == io.EOF {
 				break
 			}
 
-			fmt.Printf("Header name: %s\n", header.Name)
 			if header.Name == "image" {
-				f, err = os.Create(filepath.Join(workingDir, "image"))
+				image, err := os.Create(filepath.Join(workingDir, "image"))
 				Expect(err).NotTo(HaveOccurred())
-				_, err = io.Copy(f, r)
+				_, err = io.Copy(image, r)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}
 
-		f, err = os.OpenFile(filepath.Join(workingDir, "image"), os.O_RDONLY, 0777)
+		imageZip, err = os.OpenFile(filepath.Join(workingDir, "image"), os.O_RDONLY, 0777)
 		Expect(err).NotTo(HaveOccurred())
-		r = tar.NewReader(f)
-		h := sha1.New()
+
+		gzr, err = gzip.NewReader(imageZip)
+		Expect(err).ToNot(HaveOccurred())
+		defer gzr.Close()
+
+		r = tar.NewReader(gzr)
+		vmdkSha := sha1.New()
+		ovfSha := sha1.New()
+		var imageMF *os.File
 		for {
 			header, err := r.Next()
 			if err == io.EOF {
 				break
 			}
 
-			fmt.Printf("Header name: %s\n", header.Name)
 			if strings.Contains(header.Name, ".vmdk") {
-				io.Copy(h, r)
+				io.Copy(vmdkSha, r)
+			}
+			if strings.Contains(header.Name, ".ovf") {
+				io.Copy(ovfSha, r)
+			}
+			if strings.Contains(header.Name, ".mf") {
+				imageMF, err = os.Create(filepath.Join(workingDir, "image.mf"))
+				Expect(err).NotTo(HaveOccurred())
+				_, err = io.Copy(imageMF, r)
+				Expect(err).NotTo(HaveOccurred())
 			}
 		}
 
-		Expect(fmt.Sprintf("%x", h.Sum(nil))).To(Equal(expectedStemcellShaSum))
+
+		imageMFFile, err := helpers.ReadFile(filepath.Join(workingDir, "image.mf"))
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(imageMFFile).To(ContainSubstring(fmt.Sprintf("%x", vmdkSha.Sum(nil))))
+		Expect(imageMFFile).To(ContainSubstring(fmt.Sprintf("%x", ovfSha.Sum(nil))))
+
 	})
 
 	AfterEach(func() {
 		os.RemoveAll(workingDir)
-		//fix clone vm path (not in winnipeg)
+		// fix clone vm path (not in winnipeg)
 		if vmPath != "" {
 			cli.Run([]string{"vm.destroy", "-vm.ipath", vmPath})
 		}

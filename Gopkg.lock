@@ -274,9 +274,9 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:c2e5efe34da77eee498fbb1cb19d0b7c05ed2e2f88e9e5ca873a0b7fdaf38a46"
+  digest = "1:cbee261ab9ee939d3b38f4dd1c27bea768df61739ad8d87f464d9d4a17df1a90"
   name = "golang.org/x/build"
-  packages = ["internal/untar"]
+  packages = ["tarutil"]
   pruneopts = "UT"
   revision = "e9fe3dc8933d29df76a8b52bac5e62c41b42ab6d"
 
@@ -371,7 +371,7 @@
     "github.com/vmware/govmomi/govc/object",
     "github.com/vmware/govmomi/govc/vm",
     "github.com/xtreme-gabelan-satchithanantham/winrmcp/winrmcp",
-    "golang.org/x/build/internal/untar",
+    "golang.org/x/build/tarutil",
     "golang.org/x/sys/windows/registry",
   ]
   solver-name = "gps-cdcl"
