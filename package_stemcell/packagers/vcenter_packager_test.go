@@ -1,4 +1,4 @@
-package packagers
+package packagers_test
 
 import (
 	"archive/tar"
@@ -7,15 +7,16 @@ import (
 	"crypto/sha1"
 	"errors"
 	"fmt"
-	"github.com/cloudfoundry-incubator/stembuild/filesystem"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
 
-	"github.com/cloudfoundry-incubator/stembuild/package_stemcell/iaas_clients/iaas_clientsfakes"
+	. "github.com/cloudfoundry-incubator/stembuild/package_stemcell/packagers"
+
+	"github.com/cloudfoundry-incubator/stembuild/filesystem"
+	"github.com/cloudfoundry-incubator/stembuild/package_stemcell/packagers/packagersfakes"
 
 	"github.com/cloudfoundry-incubator/stembuild/package_stemcell/config"
 	. "github.com/onsi/ginkgo"
@@ -27,13 +28,13 @@ var _ = Describe("VcenterPackager", func() {
 	var outputDir string
 	var sourceConfig config.SourceConfig
 	var outputConfig config.OutputConfig
-	var fakeVcenterClient *iaas_clientsfakes.FakeIaasClient
+	var fakeVcenterClient *packagersfakes.FakeIaasClient
 
 	BeforeEach(func() {
 		outputDir, _ = ioutil.TempDir(os.TempDir(), "vcenter-test-output-dir")
 		sourceConfig = config.SourceConfig{Password: "password", URL: "url", Username: "username", VmInventoryPath: "path/valid-vm-name"}
 		outputConfig = config.OutputConfig{Os: "2012R2", StemcellVersion: "1200.2", OutputDir: outputDir}
-		fakeVcenterClient = &iaas_clientsfakes.FakeIaasClient{}
+		fakeVcenterClient = &packagersfakes.FakeIaasClient{}
 	})
 
 	AfterEach(func() {
@@ -94,46 +95,17 @@ var _ = Describe("VcenterPackager", func() {
 			Expect(err).To(Not(HaveOccurred()))
 		})
 	})
-	Context("Package failure cases", func() {
 
-		It("Package fails if devices were removed unsuccessfully", func() {
-			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
-			fakeVcenterClient.PrepareVMReturns(errors.New("floppy-8000 could not be removed/not found"))
-			err := packager.Package()
+	Describe("Package", func() {
+		var packager *VCenterPackager
 
-			Expect(err).To(HaveOccurred())
-			Expect(fakeVcenterClient.PrepareVMCallCount()).To(Equal(1))
-			args := fakeVcenterClient.PrepareVMArgsForCall(0)
-			Expect(args).To(Equal(sourceConfig.VmInventoryPath))
-			Expect(err.Error()).To(Equal("could not prepare the VM for export"))
-		})
-
-		It("Returns a error message if exporting the VM fails", func() {
-			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
-			fakeVcenterClient.PrepareVMReturns(nil)
-			fakeVcenterClient.ExportVMReturns(errors.New(fmt.Sprintf(sourceConfig.VmInventoryPath + " could not be exported")))
-			err := packager.Package()
-
-			Expect(err).To(HaveOccurred())
-			Expect(fakeVcenterClient.ExportVMCallCount()).To(Equal(1))
-			vmPath, _ := fakeVcenterClient.ExportVMArgsForCall(0)
-			Expect(vmPath).To(Equal(sourceConfig.VmInventoryPath))
-			Expect(err.Error()).To(Equal("failed to export the prepared VM"))
-		})
-	})
-
-	Context("Package successful case", func() {
 		AfterEach(func() {
 			_ = os.RemoveAll("./valid-vm-name")
 			_ = os.RemoveAll("image")
 		})
 
-		It("creates a valid stemcell in the output directory", func() {
-			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
-			fakeVcenterClient.PrepareVMReturns(nil)
-			fileContentMap := make(map[string]string)
-			fileContentMap["stemcell.MF"] = "file1 content\n"
-			fileContentMap["image"] = "file2 content\n"
+		BeforeEach(func() {
+			packager = &VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 
 			fakeVcenterClient.ExportVMStub = func(vmInventoryPath string, destination string) error {
 				vmName := path.Base(vmInventoryPath)
@@ -141,12 +113,12 @@ var _ = Describe("VcenterPackager", func() {
 
 				testOvfName := "valid-vm-name.content"
 				err := ioutil.WriteFile(filepath.Join(filepath.Join(destination, vmName), testOvfName), []byte(""), 0777)
-				if err != nil {
-					log.Fatal(err)
-				}
+				Expect(err).NotTo(HaveOccurred())
 				return nil
 			}
+		})
 
+		It("creates a valid stemcell in the output directory", func() {
 			err := packager.Package()
 
 			Expect(err).To(Not(HaveOccurred()))
@@ -206,6 +178,54 @@ stemcell_formats:
 			}
 			Expect(count).To(Equal(2))
 			Expect(actualStemcellManifestContent).To(Equal(expectedManifestContent))
+		})
+
+		It("removes all ethernet and floppy devices", func() {
+			fullDeviceList := []string{"video-674", "cdrom-12", "ps2-450", "ethernet-1", "floppy-8000", "floppy-9000", "video-500"}
+			expectedDeviceList := []string{"ethernet-1", "floppy-8000", "floppy-9000"}
+			fakeVcenterClient.ListDevicesReturns(fullDeviceList, nil)
+
+			err := packager.Package()
+
+			Expect(err).NotTo(HaveOccurred())
+
+			for i, device := range expectedDeviceList {
+				vmPath, deviceName := fakeVcenterClient.RemoveDeviceArgsForCall(i)
+				Expect(vmPath).To(Equal(sourceConfig.VmInventoryPath))
+				Expect(deviceName).To(Equal(device))
+			}
+		})
+
+		It("Throws an error if the VCenter client fails to list devices", func() {
+			listDevicesError := errors.New(fmt.Sprintf("VCenter failed to list devices for: %s", sourceConfig.VmInventoryPath))
+			fakeVcenterClient.ListDevicesReturns([]string{}, listDevicesError)
+
+			err := packager.Package()
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(listDevicesError))
+		})
+
+		It("Throws an error if the VCenter client fails to remove a device", func() {
+			removeDeviceError := errors.New(fmt.Sprintf("VCenter failed to remove a device from: %s", sourceConfig.VmInventoryPath))
+
+			fakeVcenterClient.ListDevicesReturns([]string{"floppy-8000"}, nil)
+			fakeVcenterClient.RemoveDeviceReturns(removeDeviceError)
+
+			err := packager.Package()
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(removeDeviceError))
+		})
+
+		It("Returns a error message if exporting the VM fails", func() {
+			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
+			fakeVcenterClient.ExportVMReturns(errors.New(fmt.Sprintf(sourceConfig.VmInventoryPath + " could not be exported")))
+			err := packager.Package()
+
+			Expect(err).To(HaveOccurred())
+			Expect(fakeVcenterClient.ExportVMCallCount()).To(Equal(1))
+			vmPath, _ := fakeVcenterClient.ExportVMArgsForCall(0)
+			Expect(vmPath).To(Equal(sourceConfig.VmInventoryPath))
+			Expect(err.Error()).To(Equal("failed to export the prepared VM"))
 		})
 	})
 })

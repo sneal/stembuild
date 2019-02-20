@@ -1,11 +1,13 @@
-package iaas_clients
+package iaas_clients_test
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 
 	"github.com/cloudfoundry-incubator/stembuild/iaas_cli/iaas_clifakes"
+	. "github.com/cloudfoundry-incubator/stembuild/package_stemcell/iaas_clients"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -104,62 +106,73 @@ var _ = Describe("VcenterClient", func() {
 		})
 	})
 
-	Context("PrepareVM", func() {
-		It("removes the ethernet device", func() {
-			expectedArgs := []string{"device.remove", "-u", credentialUrl, "-vm", "validVMPath", "ethernet-0"}
+	Describe("RemoveDevice", func() {
+		It("Removes a device from the given VM", func() {
 			runner.RunReturns(0)
-			err := vcenterClient.PrepareVM("validVMPath")
+			err := vcenterClient.RemoveDevice("validVMPath", "device")
 
 			Expect(err).To(Not(HaveOccurred()))
-			Expect(runner.RunCallCount()).To(Equal(2))
-
-			argsForRun := runner.RunArgsForCall(0)
-			Expect(argsForRun).To(Equal(expectedArgs))
-
+			expectedArgs := []string{"device.remove", "-u", credentialUrl, "-vm", "validVMPath", "device"}
+			Expect(runner.RunArgsForCall(0)).To(Equal(expectedArgs))
 		})
 
-		It("returns an error if it was not able to remove ethernet-0 for some reason", func() {
-			expectedArgs := []string{"device.remove", "-u", credentialUrl, "-vm", "validVMPath", "ethernet-0"}
+		It("Returns an error if VCenter reports a failure removing a device", func() {
 			runner.RunReturns(1)
-			err := vcenterClient.PrepareVM("validVMPath")
+			err := vcenterClient.RemoveDevice("VMPath", "deviceName")
 
 			Expect(err).To(HaveOccurred())
-			Expect(runner.RunCallCount()).To(Equal(1))
-
-			argsForRun := runner.RunArgsForCall(0)
-			Expect(argsForRun).To(Equal(expectedArgs))
-			Expect(err.Error()).To(Equal("ethernet-0 could not be removed/not found"))
-		})
-
-		It("removes the virtual floppy device", func() {
-			expectedArgs := []string{"device.remove", "-u", credentialUrl, "-vm", "validVMPath", "floppy-8000"}
-			runner.RunReturns(0)
-			runner.RunReturnsOnCall(0, 0)
-			runner.RunReturnsOnCall(1, 0)
-			err := vcenterClient.PrepareVM("validVMPath")
-
-			Expect(err).To(Not(HaveOccurred()))
-			Expect(runner.RunCallCount()).To(Equal(2))
-
-			argsForRun := runner.RunArgsForCall(1)
-			Expect(argsForRun).To(Equal(expectedArgs))
-
-		})
-
-		It("returns an error if it was not able to remove ethernet-0 for some reason", func() {
-			expectedArgs := []string{"device.remove", "-u", credentialUrl, "-vm", "validVMPath", "floppy-8000"}
-			runner.RunReturnsOnCall(0, 0)
-			runner.RunReturnsOnCall(1, 1)
-			err := vcenterClient.PrepareVM("validVMPath")
-
-			Expect(err).To(HaveOccurred())
-			Expect(runner.RunCallCount()).To(Equal(2))
-
-			argsForRun := runner.RunArgsForCall(1)
-			Expect(argsForRun).To(Equal(expectedArgs))
-			Expect(err.Error()).To(Equal("floppy-8000 could not be removed/not found"))
+			Expect(err).To(MatchError("deviceName could not be removed/not found"))
 		})
 	})
+
+	Context("ListDevices", func() {
+		var govcListDevicesOutput = `ide-200            VirtualIDEController          IDE 0
+ide-201            VirtualIDEController          IDE 1
+ps2-300            VirtualPS2Controller          PS2 controller 0
+pci-100            VirtualPCIController          PCI controller 0
+sio-400            VirtualSIOController          SIO controller 0
+floppy-8000        VirtualFloppy                 Remote
+ethernet-0         VirtualE1000e                 DVSwitch: a7 fa 3a 50 a9 72 57 5a-56 d1 f3 82 a6 1e 2a ed
+`
+
+		It("returns a list of devices for the given VM", func() {
+			runner.RunWithOutputReturns(govcListDevicesOutput, 0, nil)
+
+			devices, err := vcenterClient.ListDevices("/path/to/vm")
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(devices).To(ConsistOf(
+				"ide-200", "ide-201", "ps2-300", "pci-100", "sio-400", "floppy-8000", "ethernet-0",
+			))
+
+			Expect(runner.RunWithOutputArgsForCall(0)).To(Equal([]string{"device.ls", "-vm", "/path/to/vm"}))
+		})
+
+		It("returns an error if govc runner returns non zero exit code", func() {
+			runner.RunWithOutputReturns("", 1, nil)
+
+			_, err := vcenterClient.ListDevices("/path/to/vm")
+
+			Expect(err).To(MatchError("failed to list devices in vCenter, govc exit code 1"))
+		})
+
+		It("returns an error if RunWithOutput encounters an error", func() {
+			runner.RunWithOutputReturns("", 0, errors.New("some environment error"))
+
+			_, err := vcenterClient.ListDevices("/path/to/vm")
+
+			Expect(err).To(MatchError("failed to parse list of devices. Err: some environment error"))
+		})
+
+		It("returns govc exit code error, when both govc exit code is non zero and RunWithOutput encounters an error", func() {
+			runner.RunWithOutputReturns("", 1, errors.New("some environment error"))
+
+			_, err := vcenterClient.ListDevices("/path/to/vm")
+
+			Expect(err).To(MatchError("failed to list devices in vCenter, govc exit code 1"))
+		})
+	})
+
 	Context("ExportVM", func() {
 		var destinationDir string
 		BeforeEach(func() {

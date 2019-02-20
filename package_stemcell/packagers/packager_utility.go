@@ -101,13 +101,14 @@ func TarGenerator(destinationfileName string, sourceDirName string) (string, err
 	}
 
 	//Shouldn't be a deferred call as closing the tar writer flushes padding and writes footer which impacts the sha1sum
-	err = gzw.Close()
-	if err != nil {
-		return "", errors.New("unable to close tar file (gzip)")
-	}
+
 	err = tarfileWriter.Close()
 	if err != nil {
 		return "", errors.New("unable to close tar file")
+	}
+	err = gzw.Close()
+	if err != nil {
+		return "", errors.New("unable to close tar file (gzip)")
 	}
 
 	return fmt.Sprintf("%x", sha1Hash.Sum(nil)), nil

@@ -4,18 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/cloudfoundry-incubator/stembuild/iaas_cli"
 )
-
-//go:generate counterfeiter . IaasClient
-type IaasClient interface {
-	ValidateUrl() error
-	ValidateCredentials() error
-	FindVM(vmInventoryPath string) error
-	PrepareVM(vmInventoryPath string) error
-	ExportVM(vmInventoryPath string, destination string) error
-}
 
 type VcenterClient struct {
 	Username      string
@@ -58,28 +51,31 @@ func (c VcenterClient) FindVM(vmInventoryPath string) error {
 	return nil
 }
 
-func (c VcenterClient) PrepareVM(vmInventoryPath string) error {
-	ethernetDeviceName, floppyDeviceName := "ethernet-0", "floppy-8000"
-	var err error
+func (c VcenterClient) ListDevices(vmInventoryPath string) ([]string, error) {
+	o, exitCode, err := c.Runner.RunWithOutput([]string{"device.ls", "-vm", vmInventoryPath})
 
-	err = c.removeDevice(vmInventoryPath, ethernetDeviceName)
-	if err != nil {
-		return err
+	if exitCode != 0 {
+		return []string{}, fmt.Errorf("failed to list devices in vCenter, govc exit code %d", exitCode)
 	}
 
-	err = c.removeDevice(vmInventoryPath, floppyDeviceName)
 	if err != nil {
-		return err
+		return []string{}, fmt.Errorf("failed to parse list of devices. Err: %s", err)
 	}
 
-	return nil
+	entries := strings.Split(o, "\n")
+	devices := []string{}
+	r, _ := regexp.Compile(`\S+`)
+	for _, entry := range entries {
+		if entry != "" {
+			devices = append(devices, r.FindString(entry))
+		}
+	}
+	return devices, nil
 }
-
-func (c VcenterClient) removeDevice(vmInventoryPath string, deviceName string) error {
+func (c VcenterClient) RemoveDevice(vmInventoryPath string, deviceName string) error {
 	errCode := c.Runner.Run([]string{"device.remove", "-u", c.credentialUrl, "-vm", vmInventoryPath, deviceName})
 	if errCode != 0 {
-		errorMsg := fmt.Sprintf(deviceName + " could not be removed/not found")
-		return errors.New(errorMsg)
+		return fmt.Errorf("%s could not be removed/not found", deviceName)
 	}
 	return nil
 }

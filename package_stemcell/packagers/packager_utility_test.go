@@ -83,7 +83,6 @@ var _ bool = Describe("Packager Utility", func() {
 			expectedShasum := shasum.Sum(nil)
 			fmt.Printf("Expected sha: %x", expectedShasum)
 
-
 			tarball := filepath.Join(destinationDir, "tarball")
 			_, err = TarGenerator(tarball, sourceDir)
 			Expect(err).NotTo(HaveOccurred())
@@ -133,7 +132,7 @@ var _ bool = Describe("Packager Utility", func() {
 
 			fmt.Printf("Actual sha: %x", h.Sum(nil))
 
-			Expect(fmt.Sprintf("%x",expectedShasum)).To(Equal(fmt.Sprintf("%x", h.Sum(nil))))
+			Expect(fmt.Sprintf("%x", expectedShasum)).To(Equal(fmt.Sprintf("%x", h.Sum(nil))))
 		})
 
 		AfterEach(func() {

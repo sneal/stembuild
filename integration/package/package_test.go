@@ -27,13 +27,13 @@ import (
 
 var _ = Describe("Package", func() {
 	const (
-		baseVMName      = "stembuild-package-tests-base-vm"
-		stemcellVersion = "1803.5.3999-manual.1"
-		osVersion       = "1803"
+		baseVMName              = "stembuild-package-integration-tests-base-vm"
+		stemcellVersion         = "1803.5.3999-manual.1"
+		osVersion               = "1803"
 		vcenterURLVariable      = "GOVC_URL"
 		vcenterUsernameVariable = "GOVC_USERNAME"
 		vcenterPasswordVariable = "GOVC_PASSWORD"
-		vcenterFolderVariable   = "GOVC_FOLDER"
+		vcenterFolderVariable   = "VM_FOLDER"
 		existingVMVariable      = "EXISTING_SOURCE_VM"
 	)
 
@@ -44,22 +44,28 @@ var _ = Describe("Package", func() {
 	)
 
 	It("generates a stemcell with the correct shasum", func() {
+		executable, err := helpers.BuildStembuild()
+		Expect(err).NotTo(HaveOccurred())
+
 		existingVM := os.Getenv(existingVMVariable)
 		vcenterFolder := helpers.EnvMustExist(vcenterFolderVariable)
 
 		rand.Seed(time.Now().UnixNano())
 		if existingVM == "" {
-			sourceVMName = "stembuild-package-test-1445168366415952161" //fmt.Sprintf("stembuild-package-test-1445168366415952161", rand.Int())
+			sourceVMName = fmt.Sprintf("stembuild-package-test-%d", rand.Int())
 		} else {
 			sourceVMName = fmt.Sprintf("%s-%d", existingVM, rand.Int())
 		}
-		
+
 		baseVMWithPath := fmt.Sprintf(vcenterFolder + "/" + baseVMName)
 		vmPath = strings.Join([]string{vcenterFolder, sourceVMName}, "/")
-		cli.Run([]string{"vm.clone", "-vm", baseVMWithPath, "-on=false", sourceVMName})
 
-		executable, err := helpers.BuildStembuild()
-		Expect(err).NotTo(HaveOccurred())
+		cli.Run([]string{
+			"vm.clone",
+			"-vm", baseVMWithPath,
+			"-on=false",
+			sourceVMName,
+		})
 
 		vcenterURL := helpers.EnvMustExist(vcenterURLVariable)
 		vcenterUsername := helpers.EnvMustExist(vcenterUsernameVariable)
@@ -83,8 +89,10 @@ var _ = Describe("Package", func() {
 			"-os", osVersion,
 		)
 
-		fmt.Print(session.Out)
-		Eventually(session, 30*time.Minute, 5*time.Second).Should(gexec.Exit(0))
+		Eventually(session, 60*time.Minute, 5*time.Second).Should(gexec.Exit(0))
+		var out []byte
+		session.Out.Write(out)
+		fmt.Print(string(out))
 
 		expectedFilename := fmt.Sprintf(
 			"bosh-stemcell-%s-vsphere-esxi-windows%s-go_agent.tgz",
@@ -146,7 +154,6 @@ var _ = Describe("Package", func() {
 			}
 		}
 
-
 		imageMFFile, err := helpers.ReadFile(filepath.Join(workingDir, "image.mf"))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -156,7 +163,7 @@ var _ = Describe("Package", func() {
 	})
 
 	AfterEach(func() {
-		os.RemoveAll(workingDir)
+		//os.RemoveAll(workingDir)
 		// fix clone vm path (not in winnipeg)
 		if vmPath != "" {
 			cli.Run([]string{"vm.destroy", "-vm.ipath", vmPath})

@@ -7,26 +7,46 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 
 	"github.com/cloudfoundry-incubator/stembuild/filesystem"
 
 	"github.com/cloudfoundry-incubator/stembuild/package_stemcell/config"
-	"github.com/cloudfoundry-incubator/stembuild/package_stemcell/iaas_clients"
 )
+
+//go:generate counterfeiter . IaasClient
+type IaasClient interface {
+	ValidateUrl() error
+	ValidateCredentials() error
+	FindVM(vmInventoryPath string) error
+	ExportVM(vmInventoryPath string, destination string) error
+	ListDevices(vmInventoryPath string) ([]string, error)
+	RemoveDevice(vmInventoryPath string, deviceName string) error
+}
 
 type VCenterPackager struct {
 	SourceConfig config.SourceConfig
 	OutputConfig config.OutputConfig
-	Client       iaas_clients.IaasClient
+	Client       IaasClient
 }
 
 func (v VCenterPackager) Package() error {
 	fmt.Println(fmt.Sprintf("OS: %s", v.OutputConfig.Os))
 	fmt.Println(fmt.Sprintf("Version: %s", v.OutputConfig.StemcellVersion))
-	err := v.Client.PrepareVM(v.SourceConfig.VmInventoryPath)
+	deviceList, err := v.Client.ListDevices(v.SourceConfig.VmInventoryPath)
 	if err != nil {
-		return errors.New("could not prepare the VM for export")
+		return err
 	}
+	for _, deviceName := range deviceList {
+		matched, _ := regexp.MatchString("^(floppy-|ethernet-)", deviceName)
+		if matched {
+			err = v.Client.RemoveDevice(v.SourceConfig.VmInventoryPath, deviceName)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	workingDir, err := ioutil.TempDir(os.TempDir(), "vcenter-packager-working-directory")
 
 	if err != nil {
