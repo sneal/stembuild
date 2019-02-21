@@ -22,6 +22,7 @@ type IaasClient interface {
 	ExportVM(vmInventoryPath string, destination string) error
 	ListDevices(vmInventoryPath string) ([]string, error)
 	RemoveDevice(vmInventoryPath string, deviceName string) error
+	EjectCDRom(vmInventoryPath string, deviceName string) error
 }
 
 type VCenterPackager struct {
@@ -33,18 +34,14 @@ type VCenterPackager struct {
 func (v VCenterPackager) Package() error {
 	fmt.Println(fmt.Sprintf("OS: %s", v.OutputConfig.Os))
 	fmt.Println(fmt.Sprintf("Version: %s", v.OutputConfig.StemcellVersion))
-	deviceList, err := v.Client.ListDevices(v.SourceConfig.VmInventoryPath)
+
+	err := v.executeOnMatchingDevice(v.Client.RemoveDevice, "^(floppy-|ethernet-)")
 	if err != nil {
 		return err
 	}
-	for _, deviceName := range deviceList {
-		matched, _ := regexp.MatchString("^(floppy-|ethernet-)", deviceName)
-		if matched {
-			err = v.Client.RemoveDevice(v.SourceConfig.VmInventoryPath, deviceName)
-			if err != nil {
-				return err
-			}
-		}
+	err = v.executeOnMatchingDevice(v.Client.EjectCDRom, "^(cdrom-)")
+	if err != nil {
+		return err
 	}
 
 	workingDir, err := ioutil.TempDir(os.TempDir(), "vcenter-packager-working-directory")
@@ -89,6 +86,24 @@ func (v VCenterPackager) Package() error {
 	stemcellFilename := StemcellFilename(v.OutputConfig.StemcellVersion, v.OutputConfig.Os)
 	_, err = TarGenerator(filepath.Join(v.OutputConfig.OutputDir, stemcellFilename), stemcellDir)
 
+	return nil
+}
+
+func (v VCenterPackager) executeOnMatchingDevice(action func(a, b string) error, devicePattern string) error {
+	deviceList, err := v.Client.ListDevices(v.SourceConfig.VmInventoryPath)
+	if err != nil {
+		return err
+	}
+
+	for _, deviceName := range deviceList {
+		matched, _ := regexp.MatchString(devicePattern, deviceName)
+		if matched {
+			err = action(v.SourceConfig.VmInventoryPath, deviceName)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 

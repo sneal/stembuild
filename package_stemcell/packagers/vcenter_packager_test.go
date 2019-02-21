@@ -196,6 +196,22 @@ stemcell_formats:
 			}
 		})
 
+		It("ejects all CD ROM devices", func() {
+			fullDeviceList := []string{"video-674", "cdrom-12", "ps2-450", "ethernet-1", "cdrom-123"}
+			expectedDeviceList := []string{"cdrom-12", "cdrom-123"}
+			fakeVcenterClient.ListDevicesReturns(fullDeviceList, nil)
+
+			err := packager.Package()
+
+			Expect(err).NotTo(HaveOccurred())
+
+			for i, device := range expectedDeviceList {
+				vmPath, deviceName := fakeVcenterClient.EjectCDRomArgsForCall(i)
+				Expect(vmPath).To(Equal(sourceConfig.VmInventoryPath))
+				Expect(deviceName).To(Equal(device))
+			}
+		})
+
 		It("Throws an error if the VCenter client fails to list devices", func() {
 			listDevicesError := errors.New(fmt.Sprintf("VCenter failed to list devices for: %s", sourceConfig.VmInventoryPath))
 			fakeVcenterClient.ListDevicesReturns([]string{}, listDevicesError)

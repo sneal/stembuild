@@ -8,6 +8,18 @@ import (
 )
 
 type FakeIaasClient struct {
+	EjectCDRomStub        func(string, string) error
+	ejectCDRomMutex       sync.RWMutex
+	ejectCDRomArgsForCall []struct {
+		arg1 string
+		arg2 string
+	}
+	ejectCDRomReturns struct {
+		result1 error
+	}
+	ejectCDRomReturnsOnCall map[int]struct {
+		result1 error
+	}
 	ExportVMStub        func(string, string) error
 	exportVMMutex       sync.RWMutex
 	exportVMArgsForCall []struct {
@@ -78,6 +90,67 @@ type FakeIaasClient struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeIaasClient) EjectCDRom(arg1 string, arg2 string) error {
+	fake.ejectCDRomMutex.Lock()
+	ret, specificReturn := fake.ejectCDRomReturnsOnCall[len(fake.ejectCDRomArgsForCall)]
+	fake.ejectCDRomArgsForCall = append(fake.ejectCDRomArgsForCall, struct {
+		arg1 string
+		arg2 string
+	}{arg1, arg2})
+	fake.recordInvocation("EjectCDRom", []interface{}{arg1, arg2})
+	fake.ejectCDRomMutex.Unlock()
+	if fake.EjectCDRomStub != nil {
+		return fake.EjectCDRomStub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	fakeReturns := fake.ejectCDRomReturns
+	return fakeReturns.result1
+}
+
+func (fake *FakeIaasClient) EjectCDRomCallCount() int {
+	fake.ejectCDRomMutex.RLock()
+	defer fake.ejectCDRomMutex.RUnlock()
+	return len(fake.ejectCDRomArgsForCall)
+}
+
+func (fake *FakeIaasClient) EjectCDRomCalls(stub func(string, string) error) {
+	fake.ejectCDRomMutex.Lock()
+	defer fake.ejectCDRomMutex.Unlock()
+	fake.EjectCDRomStub = stub
+}
+
+func (fake *FakeIaasClient) EjectCDRomArgsForCall(i int) (string, string) {
+	fake.ejectCDRomMutex.RLock()
+	defer fake.ejectCDRomMutex.RUnlock()
+	argsForCall := fake.ejectCDRomArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeIaasClient) EjectCDRomReturns(result1 error) {
+	fake.ejectCDRomMutex.Lock()
+	defer fake.ejectCDRomMutex.Unlock()
+	fake.EjectCDRomStub = nil
+	fake.ejectCDRomReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeIaasClient) EjectCDRomReturnsOnCall(i int, result1 error) {
+	fake.ejectCDRomMutex.Lock()
+	defer fake.ejectCDRomMutex.Unlock()
+	fake.EjectCDRomStub = nil
+	if fake.ejectCDRomReturnsOnCall == nil {
+		fake.ejectCDRomReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.ejectCDRomReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
 }
 
 func (fake *FakeIaasClient) ExportVM(arg1 string, arg2 string) error {
@@ -432,6 +505,8 @@ func (fake *FakeIaasClient) ValidateUrlReturnsOnCall(i int, result1 error) {
 func (fake *FakeIaasClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
+	fake.ejectCDRomMutex.RLock()
+	defer fake.ejectCDRomMutex.RUnlock()
 	fake.exportVMMutex.RLock()
 	defer fake.exportVMMutex.RUnlock()
 	fake.findVMMutex.RLock()

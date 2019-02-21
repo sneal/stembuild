@@ -80,6 +80,15 @@ func (c VcenterClient) RemoveDevice(vmInventoryPath string, deviceName string) e
 	return nil
 }
 
+func (c VcenterClient) EjectCDRom(vmInventoryPath string, deviceName string) error {
+
+	errCode := c.Runner.Run([]string{"device.cdrom.eject", "-u", c.credentialUrl, "-vm", vmInventoryPath, "-device", deviceName})
+	if errCode != 0 {
+		return fmt.Errorf("%s could not be ejected", deviceName)
+	}
+	return nil
+}
+
 func (c VcenterClient) ExportVM(vmInventoryPath string, destination string) error {
 	_, err := os.Stat(destination)
 	if err != nil {

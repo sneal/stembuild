@@ -125,6 +125,25 @@ var _ = Describe("VcenterClient", func() {
 		})
 	})
 
+	Describe("EjectCDrom", func() {
+		It("Ejects a cd rom from the given VM", func() {
+			runner.RunReturns(0)
+			err := vcenterClient.EjectCDRom("validVMPath", "deviceName")
+
+			Expect(err).To(Not(HaveOccurred()))
+			expectedArgs := []string{"device.cdrom.eject", "-u", credentialUrl, "-vm", "validVMPath", "-device", "deviceName"}
+			Expect(runner.RunArgsForCall(0)).To(Equal(expectedArgs))
+		})
+
+		It("Returns an error if VCenter reports a failure ejecting the cd rom", func() {
+			runner.RunReturns(1)
+			err := vcenterClient.EjectCDRom("VMPath", "deviceName")
+
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("deviceName could not be ejected"))
+		})
+	})
+
 	Context("ListDevices", func() {
 		var govcListDevicesOutput = `ide-200            VirtualIDEController          IDE 0
 ide-201            VirtualIDEController          IDE 1
