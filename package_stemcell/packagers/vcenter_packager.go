@@ -115,18 +115,16 @@ func (v VCenterPackager) ValidateFreeSpaceForPackage(fs filesystem.FileSystem) e
 func (v VCenterPackager) ValidateSourceParameters() error {
 	err := v.Client.ValidateUrl()
 	if err != nil {
-		return errors.New("please provide a valid vCenter URL")
+		return err
 	}
 
 	err = v.Client.ValidateCredentials()
 	if err != nil {
-		errMsg := fmt.Sprintf("please provide valid credentials for %s", v.SourceConfig.URL)
-		return errors.New(errMsg)
+		return err
 	}
 	err = v.Client.FindVM(v.SourceConfig.VmInventoryPath)
 	if err != nil {
-		errorMsg := "VM path is invalid\nPlease make sure to format your inventory path correctly using the 'vm' keyword. Example: /my-datacenter/vm/my-folder/my-vm-name"
-		return errors.New(errorMsg)
+		return err
 	}
 	return nil
 }

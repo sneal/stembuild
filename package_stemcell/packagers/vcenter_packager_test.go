@@ -44,7 +44,7 @@ var _ = Describe("VcenterPackager", func() {
 	Context("ValidateSourceParameters", func() {
 		It("returns an error if the vCenter url is invalid", func() {
 
-			fakeVcenterClient.ValidateUrlReturns(errors.New("invalid url"))
+			fakeVcenterClient.ValidateUrlReturns(errors.New("please provide a valid vCenter URL"))
 
 			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 			err := packager.ValidateSourceParameters()
@@ -56,7 +56,7 @@ var _ = Describe("VcenterPackager", func() {
 		})
 		It("returns an error if the vCenter credentials are not valid", func() {
 
-			fakeVcenterClient.ValidateCredentialsReturns(errors.New("invalid credentials"))
+			fakeVcenterClient.ValidateCredentialsReturns(errors.New("please provide valid credentials for"))
 
 			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 
@@ -68,7 +68,7 @@ var _ = Describe("VcenterPackager", func() {
 		})
 
 		It("returns an error if VM given does not exist ", func() {
-			fakeVcenterClient.FindVMReturns(errors.New("invalid VM path"))
+			fakeVcenterClient.FindVMReturns(errors.New("VM path is invalid\nPlease make sure to format your inventory path correctly using the 'vm' keyword. Example: /my-datacenter/vm/my-folder/my-vm-name"))
 
 			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 
@@ -213,12 +213,11 @@ stemcell_formats:
 		})
 
 		It("Throws an error if the VCenter client fails to list devices", func() {
-			listDevicesError := errors.New(fmt.Sprintf("VCenter failed to list devices for: %s", sourceConfig.VmInventoryPath))
-			fakeVcenterClient.ListDevicesReturns([]string{}, listDevicesError)
+			fakeVcenterClient.ListDevicesReturns([]string{}, errors.New("some client error"))
 
 			err := packager.Package()
 			Expect(err).To(HaveOccurred())
-			Expect(err).To(MatchError(listDevicesError))
+			Expect(err).To(MatchError("some client error"))
 		})
 
 		It("Throws an error if the VCenter client fails to remove a device", func() {

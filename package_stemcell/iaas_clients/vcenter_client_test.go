@@ -50,7 +50,7 @@ var _ = Describe("VcenterClient", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(runner.RunCallCount()).To(Equal(1))
 			Expect(argsForRun).To(Equal(expectedArgs))
-			Expect(err.Error()).To(Equal("invalid credentials"))
+			Expect(err).To(MatchError("vcenter_client - invalid credentials for: url"))
 		})
 	})
 
@@ -77,7 +77,7 @@ var _ = Describe("VcenterClient", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(runner.RunCallCount()).To(Equal(1))
 			Expect(argsForRun).To(Equal(expectedArgs))
-			Expect(err.Error()).To(Equal("invalid url"))
+			Expect(err).To(MatchError("vcenter_client - unable to validate url: url"))
 		})
 	})
 
@@ -93,16 +93,16 @@ var _ = Describe("VcenterClient", func() {
 			Expect(argsForRun).To(Equal(expectedArgs))
 		})
 
-		It("If the VM path is valid, and the VM is found", func() {
-			expectedArgs := []string{"find", "-maxdepth=0", "-u", credentialUrl, "validVMPath"}
+		It("If the VM path is invalid", func() {
+			expectedArgs := []string{"find", "-maxdepth=0", "-u", credentialUrl, "invalidVMPath"}
 			runner.RunReturns(1)
-			err := vcenterClient.FindVM("validVMPath")
+			err := vcenterClient.FindVM("invalidVMPath")
 			argsForRun := runner.RunArgsForCall(0)
 
 			Expect(err).To(HaveOccurred())
 			Expect(runner.RunCallCount()).To(Equal(1))
 			Expect(argsForRun).To(Equal(expectedArgs))
-			Expect(err.Error()).To(Equal("invalid VM path"))
+			Expect(err).To(MatchError("vcenter_client - unable to find VM: invalidVMPath. Ensure your inventory path is formatted properly and includes \"vm\" in its path, example: /my-datacenter/vm/my-folder/my-vm-name"))
 		})
 	})
 
@@ -121,7 +121,7 @@ var _ = Describe("VcenterClient", func() {
 			err := vcenterClient.RemoveDevice("VMPath", "deviceName")
 
 			Expect(err).To(HaveOccurred())
-			Expect(err).To(MatchError("deviceName could not be removed/not found"))
+			Expect(err).To(MatchError("vcenter_client - deviceName could not be removed"))
 		})
 	})
 
@@ -140,7 +140,7 @@ var _ = Describe("VcenterClient", func() {
 			err := vcenterClient.EjectCDRom("VMPath", "deviceName")
 
 			Expect(err).To(HaveOccurred())
-			Expect(err).To(MatchError("deviceName could not be ejected"))
+			Expect(err).To(MatchError("vcenter_client - deviceName could not be ejected"))
 		})
 	})
 
@@ -172,7 +172,7 @@ ethernet-0         VirtualE1000e                 DVSwitch: a7 fa 3a 50 a9 72 57 
 
 			_, err := vcenterClient.ListDevices("/path/to/vm")
 
-			Expect(err).To(MatchError("failed to list devices in vCenter, govc exit code 1"))
+			Expect(err).To(MatchError("vcenter_client - failed to list devices in vCenter, govc exit code 1"))
 		})
 
 		It("returns an error if RunWithOutput encounters an error", func() {
@@ -180,7 +180,7 @@ ethernet-0         VirtualE1000e                 DVSwitch: a7 fa 3a 50 a9 72 57 
 
 			_, err := vcenterClient.ListDevices("/path/to/vm")
 
-			Expect(err).To(MatchError("failed to parse list of devices. Err: some environment error"))
+			Expect(err).To(MatchError("vcenter_client - failed to parse list of devices. Err: some environment error"))
 		})
 
 		It("returns govc exit code error, when both govc exit code is non zero and RunWithOutput encounters an error", func() {
@@ -188,7 +188,7 @@ ethernet-0         VirtualE1000e                 DVSwitch: a7 fa 3a 50 a9 72 57 
 
 			_, err := vcenterClient.ListDevices("/path/to/vm")
 
-			Expect(err).To(MatchError("failed to list devices in vCenter, govc exit code 1"))
+			Expect(err).To(MatchError("vcenter_client - failed to list devices in vCenter, govc exit code 1"))
 		})
 	})
 
@@ -215,7 +215,7 @@ ethernet-0         VirtualE1000e                 DVSwitch: a7 fa 3a 50 a9 72 57 
 			runner.RunReturns(1)
 			err := vcenterClient.ExportVM("validVMPath", destinationDir)
 
-			expectedErrorMsg := fmt.Sprintf(vmInventoryPath + " could not be exported")
+			expectedErrorMsg := fmt.Sprintf("vcenter_client - %s could not be exported", vmInventoryPath)
 			Expect(err).To(HaveOccurred())
 			Expect(runner.RunCallCount()).To(Equal(1))
 
@@ -228,7 +228,7 @@ ethernet-0         VirtualE1000e                 DVSwitch: a7 fa 3a 50 a9 72 57 
 			err := vcenterClient.ExportVM("validVMPath", "/FooBar/stuff")
 			Expect(err).To(HaveOccurred())
 
-			Expect(err.Error()).To(Equal("provided destination: /FooBar/stuff does not exist"))
+			Expect(err.Error()).To(Equal("vcenter_client - provided destination directory: /FooBar/stuff does not exist"))
 		})
 	})
 })

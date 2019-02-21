@@ -227,13 +227,14 @@
   version = "v1.3.0"
 
 [[projects]]
-  digest = "1:08cba65fae2166f9cc9c6fe4fa49d23ed2ddf8e56c5d91c15fb03ce5a994df5b"
+  digest = "1:d6c9b36ea4960b181ee88e895f425b15959ec03ea00868ed0e632a071d45d33e"
   name = "github.com/vmware/govmomi"
   packages = [
     "find",
     "govc/about",
     "govc/cli",
     "govc/device",
+    "govc/device/cdrom",
     "govc/export",
     "govc/flags",
     "govc/host/esxcli",
@@ -271,14 +272,6 @@
   packages = ["winrmcp"]
   pruneopts = "UT"
   revision = "ed85582c6e81fdbeb14913f22999c82a0c4a6503"
-
-[[projects]]
-  branch = "master"
-  digest = "1:cbee261ab9ee939d3b38f4dd1c27bea768df61739ad8d87f464d9d4a17df1a90"
-  name = "golang.org/x/build"
-  packages = ["tarutil"]
-  pruneopts = "UT"
-  revision = "e9fe3dc8933d29df76a8b52bac5e62c41b42ab6d"
 
 [[projects]]
   branch = "master"
@@ -366,12 +359,12 @@
     "github.com/vmware/govmomi/govc/about",
     "github.com/vmware/govmomi/govc/cli",
     "github.com/vmware/govmomi/govc/device",
+    "github.com/vmware/govmomi/govc/device/cdrom",
     "github.com/vmware/govmomi/govc/export",
     "github.com/vmware/govmomi/govc/importx",
     "github.com/vmware/govmomi/govc/object",
     "github.com/vmware/govmomi/govc/vm",
     "github.com/xtreme-gabelan-satchithanantham/winrmcp/winrmcp",
-    "golang.org/x/build/tarutil",
     "golang.org/x/sys/windows/registry",
   ]
   solver-name = "gps-cdcl"

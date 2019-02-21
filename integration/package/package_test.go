@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -38,15 +37,22 @@ var _ = Describe("Package", func() {
 	)
 
 	var (
-		workingDir   string
-		sourceVMName string
-		vmPath       string
+		workingDir      string
+		sourceVMName    string
+		vmPath          string
+		vcenterURL      string
+		vcenterUsername string
+		vcenterPassword string
+		executable      string
+		err             error
 	)
 
-	It("generates a stemcell with the correct shasum", func() {
-		executable, err := helpers.BuildStembuild()
+	BeforeSuite(func() {
+		executable, err = helpers.BuildStembuild()
 		Expect(err).NotTo(HaveOccurred())
+	})
 
+	BeforeEach(func() {
 		existingVM := os.Getenv(existingVMVariable)
 		vcenterFolder := helpers.EnvMustExist(vcenterFolderVariable)
 
@@ -67,17 +73,15 @@ var _ = Describe("Package", func() {
 			sourceVMName,
 		})
 
-		vcenterURL := helpers.EnvMustExist(vcenterURLVariable)
-		vcenterUsername := helpers.EnvMustExist(vcenterUsernameVariable)
-		vcenterPassword := helpers.EnvMustExist(vcenterPasswordVariable)
+		vcenterURL = helpers.EnvMustExist(vcenterURLVariable)
+		vcenterUsername = helpers.EnvMustExist(vcenterUsernameVariable)
+		vcenterPassword = helpers.EnvMustExist(vcenterPasswordVariable)
 
 		workingDir, err = ioutil.TempDir(os.TempDir(), "stembuild-package-test")
-		if err != nil {
-			log.Fatal(err)
-		}
-
 		Expect(err).NotTo(HaveOccurred())
+	})
 
+	It("generates a stemcell with the correct shasum", func() {
 		session := helpers.RunCommandInDir(
 			workingDir,
 			executable, "package",
@@ -100,73 +104,52 @@ var _ = Describe("Package", func() {
 		)
 		stemcellPath := filepath.Join(workingDir, expectedFilename)
 
-		stemcellZip, err := os.OpenFile(stemcellPath, os.O_RDONLY, 0777)
+		image, err := os.Create(filepath.Join(workingDir, "image"))
 		Expect(err).NotTo(HaveOccurred())
+		copyFileFromTar(stemcellPath, "image", image)
 
-		gzr, err := gzip.NewReader(stemcellZip)
-		Expect(err).ToNot(HaveOccurred())
-		defer gzr.Close()
-
-		var imageZip *os.File
-		r := tar.NewReader(gzr)
-		for {
-			header, err := r.Next()
-			if err == io.EOF {
-				break
-			}
-
-			if header.Name == "image" {
-				image, err := os.Create(filepath.Join(workingDir, "image"))
-				Expect(err).NotTo(HaveOccurred())
-				_, err = io.Copy(image, r)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		}
-
-		imageZip, err = os.OpenFile(filepath.Join(workingDir, "image"), os.O_RDONLY, 0777)
-		Expect(err).NotTo(HaveOccurred())
-
-		gzr, err = gzip.NewReader(imageZip)
-		Expect(err).ToNot(HaveOccurred())
-		defer gzr.Close()
-
-		r = tar.NewReader(gzr)
 		vmdkSha := sha1.New()
 		ovfSha := sha1.New()
-		var imageMF *os.File
-		for {
-			header, err := r.Next()
-			if err == io.EOF {
-				break
-			}
 
-			if strings.Contains(header.Name, ".vmdk") {
-				io.Copy(vmdkSha, r)
-			}
-			if strings.Contains(header.Name, ".ovf") {
-				io.Copy(ovfSha, r)
-			}
-			if strings.Contains(header.Name, ".mf") {
-				imageMF, err = os.Create(filepath.Join(workingDir, "image.mf"))
-				Expect(err).NotTo(HaveOccurred())
-				_, err = io.Copy(imageMF, r)
-				Expect(err).NotTo(HaveOccurred())
-			}
-		}
+		imageMF, err := os.Create(filepath.Join(workingDir, "image.mf"))
+		Expect(err).NotTo(HaveOccurred())
+
+		copyFileFromTar(filepath.Join(workingDir, "image"), ".mf", imageMF)
+		copyFileFromTar(filepath.Join(workingDir, "image"), ".vmdk", vmdkSha)
+		copyFileFromTar(filepath.Join(workingDir, "image"), ".ovf", ovfSha)
 
 		imageMFFile, err := helpers.ReadFile(filepath.Join(workingDir, "image.mf"))
 		Expect(err).NotTo(HaveOccurred())
-
 		Expect(imageMFFile).To(ContainSubstring(fmt.Sprintf("%x", vmdkSha.Sum(nil))))
 		Expect(imageMFFile).To(ContainSubstring(fmt.Sprintf("%x", ovfSha.Sum(nil))))
 
 	})
 
 	AfterEach(func() {
-		//os.RemoveAll(workingDir)
-		// fix clone vm path (not in winnipeg)
+		os.RemoveAll(workingDir)
 		if vmPath != "" {
 			cli.Run([]string{"vm.destroy", "-vm.ipath", vmPath})
 		}
 	})
 })
+
+func copyFileFromTar(t string, f string, w io.Writer) {
+	z, err := os.OpenFile(t, os.O_RDONLY, 0777)
+	Expect(err).NotTo(HaveOccurred())
+	gzr, err := gzip.NewReader(z)
+	Expect(err).NotTo(HaveOccurred())
+	defer gzr.Close()
+
+	r := tar.NewReader(gzr)
+	for {
+		header, err := r.Next()
+		if err == io.EOF {
+			break
+		}
+
+		if strings.Contains(header.Name, f) {
+			_, err = io.Copy(w, r)
+			Expect(err).NotTo(HaveOccurred())
+		}
+	}
+}
