@@ -2,7 +2,6 @@ package packagers
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -32,9 +31,6 @@ type VCenterPackager struct {
 }
 
 func (v VCenterPackager) Package() error {
-	fmt.Println(fmt.Sprintf("OS: %s", v.OutputConfig.Os))
-	fmt.Println(fmt.Sprintf("Version: %s", v.OutputConfig.StemcellVersion))
-
 	err := v.executeOnMatchingDevice(v.Client.RemoveDevice, "^(floppy-|ethernet-)")
 	if err != nil {
 		return err
@@ -50,19 +46,11 @@ func (v VCenterPackager) Package() error {
 		return errors.New("failed to create working directory")
 	}
 
-	fmt.Println(fmt.Sprintf("working directory: %s", workingDir))
 	stemcellDir, err := ioutil.TempDir(os.TempDir(), "vcenter-packager-stemcell-directory")
 	if err != nil {
 		return errors.New("failed to create stemcell directory")
 	}
-	fmt.Println(fmt.Sprintf("stemcell directory: %s", stemcellDir))
 	err = v.Client.ExportVM(v.SourceConfig.VmInventoryPath, workingDir)
-
-	files, _ := ioutil.ReadDir(workingDir)
-
-	for _, f := range files {
-		fmt.Println(fmt.Sprintf("working dir file: %s", f.Name()))
-	}
 
 	if err != nil {
 		return errors.New("failed to export the prepared VM")
@@ -72,12 +60,6 @@ func (v VCenterPackager) Package() error {
 	shaSum, err := TarGenerator(filepath.Join(stemcellDir, "image"), filepath.Join(workingDir, vmName))
 	manifestContents := CreateManifest(v.OutputConfig.Os, v.OutputConfig.StemcellVersion, shaSum)
 	err = WriteManifest(manifestContents, stemcellDir)
-
-	files, _ = ioutil.ReadDir(stemcellDir)
-
-	for _, f := range files {
-		fmt.Println(fmt.Sprintf("stemcell dir file: %s", f.Name()))
-	}
 
 	if err != nil {
 		return errors.New("failed to create stemcell.MF file")
@@ -108,7 +90,6 @@ func (v VCenterPackager) executeOnMatchingDevice(action func(a, b string) error,
 }
 
 func (v VCenterPackager) ValidateFreeSpaceForPackage(fs filesystem.FileSystem) error {
-	println(os.Stdout, "WARNING: Please make sure you have enough free disk space for export")
 	return nil
 }
 

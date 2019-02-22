@@ -43,43 +43,38 @@ var _ = Describe("VcenterPackager", func() {
 
 	Context("ValidateSourceParameters", func() {
 		It("returns an error if the vCenter url is invalid", func() {
-
-			fakeVcenterClient.ValidateUrlReturns(errors.New("please provide a valid vCenter URL"))
-
+			fakeVcenterClient.ValidateUrlReturns(errors.New("vcenter client url error"))
 			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
+
 			err := packager.ValidateSourceParameters()
 
 			Expect(err).To(HaveOccurred())
 			Expect(fakeVcenterClient.ValidateUrlCallCount()).To(Equal(1))
-			Expect(err.Error()).To(Equal("please provide a valid vCenter URL"))
+			Expect(err.Error()).To(Equal("vcenter client url error"))
 
 		})
 		It("returns an error if the vCenter credentials are not valid", func() {
-
-			fakeVcenterClient.ValidateCredentialsReturns(errors.New("please provide valid credentials for"))
-
+			fakeVcenterClient.ValidateCredentialsReturns(errors.New("vcenter client credential error"))
 			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 
 			err := packager.ValidateSourceParameters()
 
 			Expect(err).To(HaveOccurred())
 			Expect(fakeVcenterClient.ValidateCredentialsCallCount()).To(Equal(1))
-			Expect(err.Error()).To(ContainSubstring("please provide valid credentials for"))
+			Expect(err.Error()).To(ContainSubstring("vcenter client credential error"))
 		})
 
 		It("returns an error if VM given does not exist ", func() {
-			fakeVcenterClient.FindVMReturns(errors.New("VM path is invalid\nPlease make sure to format your inventory path correctly using the 'vm' keyword. Example: /my-datacenter/vm/my-folder/my-vm-name"))
-
+			fakeVcenterClient.FindVMReturns(errors.New("vcenter client vm error"))
 			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 
 			err := packager.ValidateSourceParameters()
 
 			Expect(err).To(HaveOccurred())
 			Expect(fakeVcenterClient.FindVMCallCount()).To(Equal(1))
-			Expect(err.Error()).To(Equal("VM path is invalid\nPlease make sure to format your inventory path correctly using the 'vm' keyword. Example: /my-datacenter/vm/my-folder/my-vm-name"))
+			Expect(err.Error()).To(Equal("vcenter client vm error"))
 		})
 		It("returns no error if all source parameters are valid", func() {
-
 			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 
 			err := packager.ValidateSourceParameters()
@@ -88,7 +83,7 @@ var _ = Describe("VcenterPackager", func() {
 		})
 	})
 	Context("ValidateFreeSpace", func() {
-		It("Print a warning to make sure that enough space is available", func() {
+		It("is a NOOP", func() {
 			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
 			err := packager.ValidateFreeSpaceForPackage(&filesystem.OSFileSystem{})
 
@@ -216,27 +211,22 @@ stemcell_formats:
 			fakeVcenterClient.ListDevicesReturns([]string{}, errors.New("some client error"))
 
 			err := packager.Package()
-			Expect(err).To(HaveOccurred())
 			Expect(err).To(MatchError("some client error"))
 		})
 
 		It("Throws an error if the VCenter client fails to remove a device", func() {
-			removeDeviceError := errors.New(fmt.Sprintf("VCenter failed to remove a device from: %s", sourceConfig.VmInventoryPath))
-
 			fakeVcenterClient.ListDevicesReturns([]string{"floppy-8000"}, nil)
-			fakeVcenterClient.RemoveDeviceReturns(removeDeviceError)
+			fakeVcenterClient.RemoveDeviceReturns(errors.New("some client error"))
 
 			err := packager.Package()
-			Expect(err).To(HaveOccurred())
-			Expect(err).To(MatchError(removeDeviceError))
+			Expect(err).To(MatchError("some client error"))
 		})
 
 		It("Returns a error message if exporting the VM fails", func() {
 			packager := VCenterPackager{SourceConfig: sourceConfig, OutputConfig: outputConfig, Client: fakeVcenterClient}
-			fakeVcenterClient.ExportVMReturns(errors.New(fmt.Sprintf(sourceConfig.VmInventoryPath + " could not be exported")))
+			fakeVcenterClient.ExportVMReturns(errors.New("some client error"))
 			err := packager.Package()
 
-			Expect(err).To(HaveOccurred())
 			Expect(fakeVcenterClient.ExportVMCallCount()).To(Equal(1))
 			vmPath, _ := fakeVcenterClient.ExportVMArgsForCall(0)
 			Expect(vmPath).To(Equal(sourceConfig.VmInventoryPath))
