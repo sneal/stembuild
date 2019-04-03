@@ -37,6 +37,31 @@ var _ = Describe("Messenger", func() {
 			Expect(buf).To(gbytes.Say("Attempting to enable WinRM on the guest vm...WinRm enabled on the guest VM"))
 		})
 	})
+	Describe("Log out users successfully", func() {
+		It("writes the started message to the writer", func() {
+			m := construct.NewMessenger(buf)
+			m.LogOutUsersStarted()
+
+			Expect(buf).To(gbytes.Say("\nAttempting to logout any remote users..."))
+		})
+
+		It("writes the succeeded message to the writer", func() {
+			m := construct.NewMessenger(buf)
+			m.LogOutUsersSucceeded()
+
+			Expect(buf).To(gbytes.Say("Logged out remote users\n"))
+		})
+
+		It("writes both LogOut messages on one line", func() {
+			m := construct.NewMessenger(buf)
+			m.LogOutUsersStarted()
+			m.LogOutUsersSucceeded()
+
+			Expect(buf).To(gbytes.Say("Attempting to logout any remote users...Logged out remote users\n"))
+		})
+
+
+	})
 
 	Describe("Validate VM connection messages", func() {
 		It("writes the started message to the writer", func() {

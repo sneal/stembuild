@@ -68,3 +68,10 @@ func (m *Messenger) UploadFileStarted(artifact string) {
 func (m *Messenger) UploadFileSucceeded() {
 	m.out.Write([]byte("succeeded.\n"))
 }
+func (m *Messenger) LogOutUsersStarted() {
+	m.out.Write([]byte("\nAttempting to logout any remote users..."))
+}
+func (m *Messenger) LogOutUsersSucceeded() {
+	m.out.Write([]byte("Logged out remote users\n"))
+}
+

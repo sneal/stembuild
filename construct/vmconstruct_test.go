@@ -162,8 +162,8 @@ var _ = Describe("construct_helpers", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(fakeZipUnarchiver.UnzipCallCount()).To(Equal(2))
-				Expect(fakeVcenterClient.StartCallCount()).To(Equal(1))
-				Expect(fakeVcenterClient.WaitForExitCallCount()).To(Equal(1))
+				Expect(fakeVcenterClient.StartCallCount()).To(Equal(2))
+				Expect(fakeVcenterClient.WaitForExitCallCount()).To(Equal(2))
 
 				archive, fileName := fakeZipUnarchiver.UnzipArgsForCall(0)
 				Expect(fileName).To(Equal("bosh-psmodules.zip"))
@@ -311,6 +311,41 @@ var _ = Describe("construct_helpers", func() {
 			})
 		})
 
+
+		Context("can log out remote users", func() {
+			It("returns success when it logs out users", func() {
+
+				fakeVcenterClient.StartReturnsOnCall(1, "5555", nil)
+
+				err := vmConstruct.PrepareVM()
+				Expect(err).ToNot(HaveOccurred())
+
+				vmPath, user, pass, command, args := fakeVcenterClient.StartArgsForCall(1)
+
+
+				Expect(command).To(Equal("C:\\Windows\\System32\\WindowsPowerShell\\V1.0\\powershell.exe"))
+				Expect(vmPath).To(Equal("fakeVmPath"))
+				Expect(args).To(Equal([]string{"-EncodedCommand"}))
+				Expect(user).To(Equal("fakeUser"))
+				Expect(pass).To(Equal("fakePass"))
+				Expect(fakeVcenterClient.StartCallCount()).To(Equal(2))
+
+				Expect(fakeMessenger.LogOutUsersStartedCallCount()).To(Equal(1))
+				Expect(fakeMessenger.LogOutUsersSucceededCallCount()).To(Equal(1))
+
+
+				vmInventoryPath, username, password, pid := fakeVcenterClient.WaitForExitArgsForCall(1)
+				Expect(vmInventoryPath).To(Equal("fakeVmPath"))
+				Expect(username).To(Equal("fakeUser"))
+				Expect(password).To(Equal("fakePass"))
+				Expect(pid).To(Equal("5555"))
+
+			})
+			It("returns failure when it does not log out users", func() {
+
+			})
+		})
+
 		Context("can extract archives", func() {
 			BeforeEach(func() {
 				fakeZipUnarchiver.UnzipReturns([]byte("extracted archive"), nil)
@@ -377,5 +412,6 @@ var _ = Describe("construct_helpers", func() {
 			})
 
 		})
+
 	})
 })
