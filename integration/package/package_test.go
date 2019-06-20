@@ -34,6 +34,7 @@ var _ = Describe("Package", func() {
 		existingVMVariable                = "EXISTING_SOURCE_VM"
 		vcenterStembuildUsernameVariable  = "VCENTER_STEMBUILD_USER"
 		vcenterStembuildPasswordVariable  = "VCENTER_STEMBUILD_PASSWORD"
+		stembuildVersionVariable          = "STEMBUILD_VERSION"
 	)
 
 	var (
@@ -54,7 +55,8 @@ var _ = Describe("Package", func() {
 		versionFilePath := filepath.Join(directory, "..", "..", "version", "version")
 		ioutil.WriteFile(versionFilePath, []byte(mainVersion), 0777)
 
-		executable, err = helpers.BuildStembuild()
+		stembuildVersion := helpers.EnvMustExist(stembuildVersionVariable)
+		executable, err = helpers.BuildStembuild(stembuildVersion)
 		Expect(err).NotTo(HaveOccurred())
 
 		baseVMName = os.Getenv(baseVMNameEnvVar)

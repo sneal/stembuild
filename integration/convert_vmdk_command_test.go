@@ -31,7 +31,9 @@ var _ = Describe("Convert VMDK", func() {
 				It("of 1709 returns an error", func() {
 					version = "1709.0"
 					expectedOSVersionInNameANdManifest := "2016"
-					buildNewStembuildVersion("9999.1.0")
+					// TODO: probable bug below: BuildStembuild returns the path to the new stembuild, if we don't capture, line 40 will use an old one
+					// at least i think?
+					helpers.BuildStembuild("9999.1.0")
 
 					stemcellFilename = fmt.Sprintf("bosh-stemcell-%s-vsphere-esxi-windows%s-go_agent.tgz", version, expectedOSVersionInNameANdManifest)
 					inputVmdk = filepath.Join("..", "test", "data", "expected.vmdk")
@@ -53,7 +55,7 @@ var _ = Describe("Convert VMDK", func() {
 			})
 
 			It("creates a valid 2012R2 stemcell", func() {
-				buildNewStembuildVersion("1200.0.0")
+				helpers.BuildStembuild("1200.0.0")
 				osVersion = "2012R2"
 				version = "1200.0"
 				stemcellFilename = fmt.Sprintf("bosh-stemcell-%s-vsphere-esxi-windows%s-go_agent.tgz", version, osVersion)
@@ -86,7 +88,7 @@ var _ = Describe("Convert VMDK", func() {
 			})
 
 			It("creates a valid 1803 stemcell", func() {
-				buildNewStembuildVersion("1803.0.0")
+				helpers.BuildStembuild("1803.0.0")
 				osVersion = "1803"
 				version = "1803.0"
 				stemcellFilename = fmt.Sprintf("bosh-stemcell-%s-vsphere-esxi-windows%s-go_agent.tgz", version, osVersion)
@@ -119,7 +121,7 @@ var _ = Describe("Convert VMDK", func() {
 			})
 
 			It("creates a valid 2019 stemcell", func() {
-				buildNewStembuildVersion("2019.0.0")
+				helpers.BuildStembuild("2019.0.0")
 				osVersion = "2019"
 				version = "2019.0"
 				stemcellFilename = fmt.Sprintf("bosh-stemcell-%s-vsphere-esxi-windows%s-go_agent.tgz", version, osVersion)
@@ -152,7 +154,7 @@ var _ = Describe("Convert VMDK", func() {
 			})
 
 			It("creates a valid 2016 stemcell", func() {
-				buildNewStembuildVersion("1709.0.0")
+				helpers.BuildStembuild("1709.0.0")
 				osVersion = "2016"
 				version = "1709.0"
 				stemcellFilename = fmt.Sprintf("bosh-stemcell-%s-vsphere-esxi-windows%s-go_agent.tgz", version, osVersion)
@@ -205,12 +207,7 @@ func expectStembuildToSucceed(arguments ...string) *Session {
 
 //Stembuild now has stemcell-version baked in. So, it must be rebuilt if a test uses a different stemcell-version
 func buildNewStembuildVersion(version string) {
-	directory, err := os.Getwd()
-	Expect(err).ToNot(HaveOccurred())
-
-	versionFile := filepath.Join(directory, "..", "version", "version")
-	ioutil.WriteFile(versionFile, []byte(version), 0777)
-
-	stembuildExecutable, err = helpers.BuildStembuild()
+	var err error
+	stembuildExecutable, err = helpers.BuildStembuild(version)
 	Expect(err).NotTo(HaveOccurred())
 }
