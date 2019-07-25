@@ -3,9 +3,13 @@ package iaas_clients
 import (
 	"context"
 	"fmt"
+	"github.com/onsi/gomega/gbytes"
+
+	//"github.com/onsi/gomega/gbytes"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	//"time"
 
 	"github.com/cloudfoundry-incubator/stembuild/iaas_cli/iaas_clients/factory"
 
@@ -23,37 +27,39 @@ func envMustExist(variableName string) string {
 }
 
 var _ = Describe("VcenterClient", func() {
-	Describe("StartProgram", func() {
 
-		var (
-			managerFactory *vcenter_client_factory.ManagerFactory
-			factoryConfig  *vcenter_client_factory.FactoryConfig
-		)
-		ExpectProgramToStartAndExitSuccessfully := func() {
+	var (
+		managerFactory *vcenter_client_factory.ManagerFactory
+		factoryConfig  *vcenter_client_factory.FactoryConfig
+	)
+	ExpectProgramToStartAndExitSuccessfully := func() {
 
-			ctx := context.TODO()
+		ctx := context.TODO()
 
-			vCenterManager, err := managerFactory.VCenterManager(ctx)
-			Expect(err).ToNot(HaveOccurred())
+		vCenterManager, err := managerFactory.VCenterManager(ctx)
+		Expect(err).ToNot(HaveOccurred())
 
-			err = vCenterManager.Login(ctx)
-			Expect(err).ToNot(HaveOccurred())
+		err = vCenterManager.Login(ctx)
+		Expect(err).ToNot(HaveOccurred())
 
-			vm, err := vCenterManager.FindVM(ctx, TestVmPath)
-			Expect(err).ToNot(HaveOccurred())
+		vm, err := vCenterManager.FindVM(ctx, TestVmPath)
+		Expect(err).ToNot(HaveOccurred())
 
-			opsManager := vCenterManager.OperationsManager(ctx, vm)
-			guestManager, err := vCenterManager.GuestManager(ctx, opsManager, envMustExist(TestVmUsername), envMustExist(TestVmPassword))
-			Expect(err).ToNot(HaveOccurred())
+		opsManager := vCenterManager.OperationsManager(ctx, vm)
+		guestManager, err := vCenterManager.GuestManager(ctx, opsManager, envMustExist(TestVmUsername), envMustExist(TestVmPassword))
+		Expect(err).ToNot(HaveOccurred())
 
-			powershell := "C:\\Windows\\System32\\WindowsPowerShell\\V1.0\\powershell.exe"
-			pid, err := guestManager.StartProgramInGuest(ctx, powershell, "Exit 59")
-			Expect(err).ToNot(HaveOccurred())
+		powershell := "C:\\Windows\\System32\\WindowsPowerShell\\V1.0\\powershell.exe"
+		pid, err := guestManager.StartProgramInGuest(ctx, powershell, "Exit 59")
+		Expect(err).ToNot(HaveOccurred())
 
-			exitCode, err := guestManager.ExitCodeForProgramInGuest(ctx, pid)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(exitCode).To(Equal(int32(59)))
-		}
+		exitCode, err := guestManager.ExitCodeForProgramInGuest(ctx, pid)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(exitCode).To(Equal(int32(59)))
+	}
+
+	Describe("StartProgramInGuest", func() {
+
 
 		BeforeEach(func() {
 
@@ -128,6 +134,147 @@ var _ = Describe("VcenterClient", func() {
 
 			})
 		})
-
 	})
+
+	Describe("DownloadFileFromGuest", func() {
+
+		// TODO: don't forget to refactor across describe blocks, fam.
+		var (
+			managerFactory *vcenter_client_factory.ManagerFactory
+			factoryConfig  *vcenter_client_factory.FactoryConfig
+			fileToDownload string
+			expectedContents string
+		)
+
+		ExpectProgramToStartAndExitSuccessfullyMakeFile := func() {
+
+			ctx := context.TODO()
+
+			vCenterManager, err := managerFactory.VCenterManager(ctx)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = vCenterManager.Login(ctx)
+			Expect(err).ToNot(HaveOccurred())
+
+			vm, err := vCenterManager.FindVM(ctx, TestVmPath)
+			Expect(err).ToNot(HaveOccurred())
+
+			opsManager := vCenterManager.OperationsManager(ctx, vm)
+			guestManager, err := vCenterManager.GuestManager(ctx, opsManager, envMustExist(TestVmUsername), envMustExist(TestVmPassword))
+			Expect(err).ToNot(HaveOccurred())
+
+			powershell := "C:\\Windows\\System32\\WindowsPowerShell\\V1.0\\powershell.exe"
+			pid, err := guestManager.StartProgramInGuest(ctx, powershell, fmt.Sprintf("'%s' | Set-Content %s", expectedContents, fileToDownload))
+			Expect(err).ToNot(HaveOccurred())
+
+			exitCode, err := guestManager.ExitCodeForProgramInGuest(ctx, pid)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(exitCode).To(Equal(int32(0)))
+		}
+
+		ExpectProgramToStartAndExitSuccessfullyDeleteFile := func() {
+
+			ctx := context.TODO()
+
+			vCenterManager, err := managerFactory.VCenterManager(ctx)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = vCenterManager.Login(ctx)
+			Expect(err).ToNot(HaveOccurred())
+
+			vm, err := vCenterManager.FindVM(ctx, TestVmPath)
+			Expect(err).ToNot(HaveOccurred())
+
+			opsManager := vCenterManager.OperationsManager(ctx, vm)
+			guestManager, err := vCenterManager.GuestManager(ctx, opsManager, envMustExist(TestVmUsername), envMustExist(TestVmPassword))
+			Expect(err).ToNot(HaveOccurred())
+
+			powershell := "C:\\Windows\\System32\\WindowsPowerShell\\V1.0\\powershell.exe"
+			pid, err := guestManager.StartProgramInGuest(ctx, powershell, fmt.Sprintf("rm %s", fileToDownload))
+			Expect(err).ToNot(HaveOccurred())
+
+			exitCode, err := guestManager.ExitCodeForProgramInGuest(ctx, pid)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(exitCode).To(Equal(int32(0)))
+		}
+
+		BeforeEach(func() {
+
+			factoryConfig = &vcenter_client_factory.FactoryConfig{
+				VCenterServer: envMustExist(VcenterUrl),
+				Username:      envMustExist(VcenterUsername),
+				Password:      envMustExist(VcenterPassword),
+				ClientCreator: &vcenter_client_factory.ClientCreator{},
+				FinderCreator: &vcenter_client_factory.GovmomiFinderCreator{},
+			}
+
+			managerFactory = &vcenter_client_factory.ManagerFactory{}
+			fileToDownload = "C:\\Windows\\dummy.txt"
+			expectedContents = "infinite content"
+		})
+
+		AfterEach(func() {
+			managerFactory = nil
+		})
+
+		Context("specified file exists", func() {
+
+			//BeforeEach(func() {
+			//	ExpectProgramToStartAndExitSuccessfullyMakeFile()
+			//})
+			It("downloads the file", func() {
+				factoryConfig.RootCACertPath = ""
+				managerFactory.SetConfig(*factoryConfig)
+
+				ExpectProgramToStartAndExitSuccessfullyMakeFile()
+				ctx := context.TODO()
+				vCenterManager, err := managerFactory.VCenterManager(ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = vCenterManager.Login(ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				vm, err := vCenterManager.FindVM(ctx, TestVmPath)
+				Expect(err).ToNot(HaveOccurred())
+
+				opsManager := vCenterManager.OperationsManager(ctx, vm)
+				guestManager, err := vCenterManager.GuestManager(ctx, opsManager, envMustExist(TestVmUsername), envMustExist(TestVmPassword))
+				Expect(err).ToNot(HaveOccurred())
+
+				fileContents, _, err := guestManager.DownloadFileInGuest(ctx, fileToDownload)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(gbytes.BufferReader(fileContents)).Should(gbytes.Say(expectedContents))
+
+			})
+			AfterEach(func() {
+				ExpectProgramToStartAndExitSuccessfullyDeleteFile()
+			})
+		})
+
+		Context("specified file does not exist", func() {
+			It("returns an error", func() {
+				factoryConfig.RootCACertPath = ""
+				managerFactory.SetConfig(*factoryConfig)
+
+				ctx := context.TODO()
+				vCenterManager, err := managerFactory.VCenterManager(ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = vCenterManager.Login(ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				vm, err := vCenterManager.FindVM(ctx, TestVmPath)
+				Expect(err).ToNot(HaveOccurred())
+
+				opsManager := vCenterManager.OperationsManager(ctx, vm)
+				guestManager, err := vCenterManager.GuestManager(ctx, opsManager, envMustExist(TestVmUsername), envMustExist(TestVmPassword))
+				Expect(err).ToNot(HaveOccurred())
+
+				_, _, err = guestManager.DownloadFileInGuest(ctx, fileToDownload)
+				Expect(err).To(MatchError("vcenter_client - unable to download file"))
+			})
+		})
+	})
+
 })
