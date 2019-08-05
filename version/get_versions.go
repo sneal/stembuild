@@ -5,6 +5,8 @@ import (
 )
 
 var Version = "dev"
+var oSBuildNumberToVersionMap = map[string]string{"17763": "2019", "17134": "1803", "dev":"dev"}
+
 
 func GetVersions(mainVersion string) (string, string) {
 	stringArr := strings.Split(mainVersion, ".")
@@ -19,4 +21,8 @@ func GetVersions(mainVersion string) (string, string) {
 	stemcellVersion := strings.Join(stringArr[0:2], ".")
 
 	return os, stemcellVersion
+}
+
+func GetOSVersionFromBuildNumber(version string) string {
+	return oSBuildNumberToVersionMap[version]
 }

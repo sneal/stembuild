@@ -3,6 +3,7 @@ package iaas_clients
 import (
 	"context"
 	"fmt"
+
 	"github.com/cloudfoundry-incubator/stembuild/iaas_cli/iaas_clients/guest_manager"
 	"github.com/onsi/gomega/gbytes"
 
@@ -10,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cloudfoundry-incubator/stembuild/iaas_cli/iaas_clients/factory"
+	vcenter_client_factory "github.com/cloudfoundry-incubator/stembuild/iaas_cli/iaas_clients/factory"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -123,11 +124,11 @@ var _ = Describe("VcenterClient", func() {
 
 	Describe("DownloadFileFromGuest", func() {
 		var (
-			managerFactory *vcenter_client_factory.ManagerFactory
-			factoryConfig  *vcenter_client_factory.FactoryConfig
-			fileToDownload string
+			managerFactory   *vcenter_client_factory.ManagerFactory
+			factoryConfig    *vcenter_client_factory.FactoryConfig
+			fileToDownload   string
 			expectedContents string
-			guestManager *guest_manager.GuestManager
+			guestManager     *guest_manager.GuestManager
 		)
 
 		BeforeEach(func() {
@@ -199,7 +200,7 @@ var _ = Describe("VcenterClient", func() {
 			It("returns an error", func() {
 				ctx := context.TODO()
 				_, _, err := guestManager.DownloadFileInGuest(ctx, fileToDownload)
-				Expect(err).To(MatchError("vcenter_client - unable to download file"))
+				Expect(err.Error()).To(ContainSubstring("vcenter_client - unable to download file"))
 			})
 		})
 	})

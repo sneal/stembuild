@@ -2,13 +2,13 @@ package guest_manager
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/vmware/govmomi/vim25"
-	"github.com/vmware/govmomi/vim25/soap"
 	"io"
 	"net/url"
 	"time"
+
+	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/soap"
 
 	"github.com/vmware/govmomi/vim25/types"
 )
@@ -26,14 +26,20 @@ type FileManager interface {
 	TransferURL(ctx context.Context, u string) (*url.URL, error)
 }
 
+//go:generate counterfeiter . DownloadClient
+type DownloadClient interface {
+	Download(ctx context.Context, u *url.URL, param *soap.Download) (io.ReadCloser, int64, error)
+}
+
 type GuestManager struct {
 	auth           types.NamePasswordAuthentication
 	processManager ProcManager
 	fileManager    FileManager
+	client         DownloadClient
 }
 
-func NewGuestManager(auth types.NamePasswordAuthentication, processManager ProcManager, fileManager FileManager) *GuestManager {
-	return &GuestManager{auth, processManager, fileManager}
+func NewGuestManager(auth types.NamePasswordAuthentication, processManager ProcManager, fileManager FileManager, client DownloadClient) *GuestManager {
+	return &GuestManager{auth, processManager, fileManager, client}
 }
 
 func (g *GuestManager) StartProgramInGuest(ctx context.Context, command, args string) (int64, error) {
@@ -72,23 +78,21 @@ func (g *GuestManager) ExitCodeForProgramInGuest(ctx context.Context, pid int64)
 }
 
 func (g *GuestManager) DownloadFileInGuest(ctx context.Context, path string) (io.Reader, int64, error) {
-	vc := g.processManager.Client()
-
 	info, err := g.fileManager.InitiateFileTransferFromGuest(ctx, &g.auth, path)
 	if err != nil {
-		return nil, 0, errors.New("vcenter_client - unable to download file")
+		return nil, 0, fmt.Errorf("vcenter_client - unable to download file: %s", err.Error())
 	}
 
 	u, err := g.fileManager.TransferURL(ctx, info.Url)
 	if err != nil {
-		return nil, 0, errors.New("vcenter_client - unable to download file")
+		return nil, 0, fmt.Errorf("vcenter_client - unable to download file: %s", err.Error())
 	}
 
 	p := soap.DefaultDownload
 
-	f, n, err := vc.Download(ctx, u, &p)
+	f, n, err := g.client.Download(ctx, u, &p)
 	if err != nil {
-		return nil, n, errors.New("vcenter_client - unable to download file")
+		return nil, n, fmt.Errorf("vcenter_client - unable to download file: %s", err.Error())
 	}
 
 	return f, n, nil

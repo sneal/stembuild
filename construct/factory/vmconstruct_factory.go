@@ -21,8 +21,6 @@ func (f *VMConstructFactory) VMPreparer(config config.SourceConfig, vCenterManag
 	runner := &iaas_cli.GovcRunner{}
 	client := iaas_clients.NewVcenterClient(config.VCenterUsername, config.VCenterPassword, config.VCenterUrl, config.CaCertFile, runner)
 
-	zip := &archive.Zip{}
-
 	messenger := construct.NewMessenger(os.Stdout)
 
 	ctx := context.Background()
@@ -43,6 +41,15 @@ func (f *VMConstructFactory) VMPreparer(config config.SourceConfig, vCenterManag
 		return nil, err
 	}
 
+	winRMManager := &construct.WinRMManager{
+		GuestManager: guestManager,
+		Unarchiver:   &archive.Zip{},
+	}
+	osValidator := &construct.OSVersionValidator{
+		GuestManager: guestManager,
+		Messenger:    messenger,
+	}
+
 	return construct.NewVMConstruct(
 		ctx,
 		NewWinRM(config.GuestVmIp, config.GuestVMUsername, config.GuestVMPassword),
@@ -51,7 +58,8 @@ func (f *VMConstructFactory) VMPreparer(config config.SourceConfig, vCenterManag
 		config.VmInventoryPath,
 		client,
 		guestManager,
-		zip,
+		winRMManager,
+		osValidator,
 		messenger,
 	), nil
 }

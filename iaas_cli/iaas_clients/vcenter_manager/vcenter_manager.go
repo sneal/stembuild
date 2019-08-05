@@ -134,5 +134,5 @@ func (v *VCenterManager) GuestManager(ctx context.Context, opsManager OpsManager
 		Username: username,
 		Password: password,
 	}
-	return guest_manager.NewGuestManager(auth, processManager, fileManager), nil
+	return guest_manager.NewGuestManager(auth, processManager, fileManager, v.vimClient), nil
 }
