@@ -54,6 +54,28 @@ var _ = Describe("stembuild construct", func() {
 		})
 	})
 
+	Context("username with special characters", func() {
+
+		var (
+			specialConf config
+		)
+
+		BeforeEach(func() {
+			specialConf = conf
+			// set conf here
+		})
+
+		FIt("roll with it", func() {
+			err := CopyFile(filepath.Join(workingDir, "assets", "LGPO.zip"), filepath.Join(workingDir, "LGPO.zip"))
+			Expect(err).ToNot(HaveOccurred())
+
+			session := helpers.Stembuild(stembuildExecutable, "construct", "-vm-ip", specialConf.TargetIP, "-vm-username", specialConf.VMUsername, "-vm-password", specialConf.VMPassword, "-vcenter-url", specialConf.VCenterURL, "-vcenter-username", specialConf.VCenterUsername, "-vcenter-password", specialConf.VCenterPassword, "-vm-inventory-path", specialConf.VMInventoryPath)
+
+			Eventually(session, 20).Should(Exit(0))
+			Eventually(session.Out).Should(Say(`mock stemcell automation script executed`))
+		})
+	})
+
 	It("fails with an appropriate error when LGPO is missing", func() {
 		session := helpers.Stembuild(stembuildExecutable, "construct", "-vm-ip", conf.TargetIP, "-vm-username", conf.VMUsername, "-vm-password", conf.VMPassword, "-vcenter-url", conf.VCenterURL, "-vcenter-username", conf.VCenterUsername, "-vcenter-password", conf.VCenterPassword, "-vm-inventory-path", conf.VMInventoryPath)
 

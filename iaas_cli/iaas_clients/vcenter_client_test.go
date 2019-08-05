@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("VcenterClient", func() {
+var _ = FDescribe("VcenterClient", func() {
 	var (
 		runner                  *iaas_clifakes.FakeCliRunner
 		username, password, url string
