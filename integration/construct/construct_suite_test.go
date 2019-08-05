@@ -311,11 +311,13 @@ func validatedOVALocation() string {
 	ovaFile, err := ioutil.TempFile(tmpDir, "stembuild-construct-test.ova")
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("%s unable to create temporary OVA file", failureDescription))
 
-	sess, _ := session.NewSession(
+	sess, err := session.NewSession(
 		&aws.Config{
 			Region: aws.String(s3Region),
 		},
 	)
+
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("%s unable to create aws s3 session", failureDescription))
 
 	s3Downloader := s3manager.NewDownloader(sess)
 	_, err = s3Downloader.Download(
@@ -327,6 +329,9 @@ func validatedOVALocation() string {
 	)
 
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("%s failed to download test OVA", failureDescription))
+
+	err = ovaFile.Close()
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("%s failed to write-close test OVA file", failureDescription))
 
 	fmt.Printf("Downloaded OVA file to %s\n", ovaFile.Name())
 
