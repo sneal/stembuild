@@ -24,7 +24,6 @@ func NewVcenterClient(username string, password string, u string, caCertFile str
 	encodedUser := url.QueryEscape(username)
 	encodedPassword := url.QueryEscape(password)
 	urlWithCredentials := fmt.Sprintf("%s:%s@%s", encodedUser, encodedPassword, u)
-	fmt.Printf("\n\ncredentials: %s\n\n", urlWithCredentials)
 	return &VcenterClient{Url: u, credentialUrl: urlWithCredentials, caCertFile: caCertFile, Runner: runner}
 }
 
@@ -47,7 +46,7 @@ func (c *VcenterClient) ValidateCredentials() error {
 	args := c.buildGovcCommand("about")
 	errCode := c.Runner.Run(args)
 	if errCode != 0 {
-		return errors.New(fmt.Sprintf("vcenter_client - invalid credentials for: %s", c.Url))
+		return errors.New(fmt.Sprintf("vcenter_client - invalid credentials for: %s", c.credentialUrl))
 	}
 
 	return nil

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/cloudfoundry-incubator/stembuild/remotemanager"
 
@@ -47,32 +48,26 @@ var _ = Describe("stembuild construct", func() {
 
 		})
 
+		It("handles special characters", func() {
+			isAlphaNumeric, err := regexp.Compile("[a-zA-Z0-9]+")
+			Expect(err).ToNot(HaveOccurred())
+
+			if isAlphaNumeric.MatchString(conf.VCenterUsername) && isAlphaNumeric.MatchString(conf.VCenterPassword) {
+				Skip("vCenter username or password must contain special characters")
+			}
+			err = CopyFile(filepath.Join(workingDir, "assets", "LGPO.zip"), filepath.Join(workingDir, "LGPO.zip"))
+			Expect(err).ToNot(HaveOccurred())
+
+			session := helpers.Stembuild(stembuildExecutable, "construct", "-vm-ip", conf.TargetIP, "-vm-username", conf.VMUsername, "-vm-password", conf.VMPassword, "-vcenter-url", conf.VCenterURL, "-vcenter-username", conf.VCenterUsername, "-vcenter-password", conf.VCenterPassword, "-vm-inventory-path", conf.VMInventoryPath)
+
+			Eventually(session, 20).Should(Exit(0))
+			Eventually(session.Out).Should(Say(`mock stemcell automation script executed`))
+		})
+
 		AfterEach(func() {
 			rm := remotemanager.NewWinRM(conf.TargetIP, conf.VMUsername, conf.VMPassword)
 			err := rm.ExecuteCommand("powershell.exe Remove-Item c:\\provision -recurse")
 			Expect(err).ToNot(HaveOccurred())
-		})
-	})
-
-	Context("username with special characters", func() {
-
-		var (
-			specialConf config
-		)
-
-		BeforeEach(func() {
-			specialConf = conf
-			// set conf here
-		})
-
-		FIt("roll with it", func() {
-			err := CopyFile(filepath.Join(workingDir, "assets", "LGPO.zip"), filepath.Join(workingDir, "LGPO.zip"))
-			Expect(err).ToNot(HaveOccurred())
-
-			session := helpers.Stembuild(stembuildExecutable, "construct", "-vm-ip", specialConf.TargetIP, "-vm-username", specialConf.VMUsername, "-vm-password", specialConf.VMPassword, "-vcenter-url", specialConf.VCenterURL, "-vcenter-username", specialConf.VCenterUsername, "-vcenter-password", specialConf.VCenterPassword, "-vm-inventory-path", specialConf.VMInventoryPath)
-
-			Eventually(session, 20).Should(Exit(0))
-			Eventually(session.Out).Should(Say(`mock stemcell automation script executed`))
 		})
 	})
 
