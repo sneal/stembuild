@@ -25,6 +25,7 @@ import (
 	"github.com/vmware/govmomi/govc/cli"
 	_ "github.com/vmware/govmomi/govc/importx"
 	_ "github.com/vmware/govmomi/govc/vm"
+	_ "github.com/vmware/govmomi/govc/vm/snapshot"
 
 	"syscall"
 
@@ -193,8 +194,22 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		targetIP = userProvidedIP
 		fmt.Printf("Creating VM with IP: %s\n", targetIP)
 		createVMWithIP(targetIP, vmNamePrefix, vcenterFolder)
-	}
-	if existingVMIP != "" {
+	} else if existingVMIP == "" {
+		//if targetIP == "" {
+		fmt.Println("Finding available IP...")
+		targetIP = claimAvailableIP()
+		createVMWithIP(targetIP, vmNamePrefix, vcenterFolder)
+
+		vmSnapshotName := "integration-test-snapshot"
+		snapshotCommand := []string{
+			"snapshot.create",
+			fmt.Sprintf("-vm.ipath=%s", conf.VMInventoryPath),
+			fmt.Sprintf("-u=%s", vcenterAdminCredentialUrl),
+			vmSnapshotName,
+		}
+		fmt.Printf("Creating VM Snapshot: %s", vmSnapshotName)
+		runIgnoringOutput(snapshotCommand)
+	} else {
 		existingVM = true
 		targetIP = existingVMIP
 		fmt.Printf("Using existing VM with IP: %s\n", targetIP)
@@ -204,14 +219,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		conf.VMName = vmName
 		vmInventoryPath := strings.Join([]string{vcenterFolder, vmName}, "/")
 		conf.VMInventoryPath = vmInventoryPath
-
 	}
-	if targetIP == "" {
-		fmt.Println("Finding available IP...")
-		targetIP = claimAvailableIP()
-		createVMWithIP(targetIP, vmNamePrefix, vcenterFolder)
-	}
-
 	fmt.Println("Attempting to connect to VM")
 	endpoint := winrm.NewEndpoint(targetIP, 5985, false, true, nil, nil, nil, 0)
 	client, err := winrm.NewClient(endpoint, vmUsername, vmPassword)
@@ -275,7 +283,6 @@ func createVMWithIP(targetIP, vmNamePrefix, vcenterFolder string) {
 
 	exitCode := cli.Run(opts)
 	Expect(exitCode).To(BeZero())
-
 }
 
 func validatedOVALocation() string {

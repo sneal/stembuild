@@ -21,20 +21,55 @@ var _ = Describe("stembuild construct", func() {
 
 	BeforeEach(func() {
 		var err error
+
+		//revert snapshot
+		//vmSnapshotName := "integration-test-snapshot"
+		//snapshotCommand := []string{
+		//	"snapshot.revert",
+		//	fmt.Sprintf("-vm.ipath=%s", conf.VMInventoryPath),
+		//	fmt.Sprintf("-u=%s", vcenterAdminCredentialUrl),
+		//	vmSnapshotName,
+		//}
+		//fmt.Printf("Reverting VM Snapshot: %s", vmSnapshotName)
+		//runIgnoringOutput(snapshotCommand)
+		//time.Sleep(30 * time.Second)
+
 		workingDir, err = os.Getwd()
 		Expect(err).ToNot(HaveOccurred())
 
 	})
 
 	Context("run successfully", func() {
+
+		It("successfully exits when vm becomes powered off", func() {
+			err := CopyFile(filepath.Join(workingDir, "assets", "LGPO.zip"), filepath.Join(workingDir, "LGPO.zip"))
+			Expect(err).ToNot(HaveOccurred())
+
+			session := helpers.Stembuild(stembuildExecutable, "construct", "-vm-ip", conf.TargetIP, "-vm-username", conf.VMUsername, "-vm-password", conf.VMPassword, "-vcenter-url", conf.VCenterURL, "-vcenter-username", conf.VCenterUsername, "-vcenter-password", conf.VCenterPassword, "-vm-inventory-path", conf.VMInventoryPath)
+
+			//powerOffCommand := []string{
+			//	"vm.power",
+			//	fmt.Sprintf("-vm.ip=%s", conf.TargetIP),
+			//	fmt.Sprintf("-u=%s", vcenterAdminCredentialUrl),
+			//	fmt.Sprintf("-off"),
+			//}
+
+			//time.Sleep(30 * time.Second)
+			//runIgnoringOutput(powerOffCommand)
+
+			Eventually(session, 3*time.Minute).Should(Exit(0)) // blocks until success
+
+			fmt.Println("VM powered off")
+
+		})
+
 		It("transfers LGPO and StemcellAutomation archives, unarchive them and execute automation script", func() {
 			err := CopyFile(filepath.Join(workingDir, "assets", "LGPO.zip"), filepath.Join(workingDir, "LGPO.zip"))
 			Expect(err).ToNot(HaveOccurred())
 
 			session := helpers.Stembuild(stembuildExecutable, "construct", "-vm-ip", conf.TargetIP, "-vm-username", conf.VMUsername, "-vm-password", conf.VMPassword, "-vcenter-url", conf.VCenterURL, "-vcenter-username", conf.VCenterUsername, "-vcenter-password", conf.VCenterPassword, "-vm-inventory-path", conf.VMInventoryPath)
 
-			Eventually(session, 20*time.Minute).Should(Exit(0))
-			Eventually(session.Out).Should(Say(`mock stemcell automation script executed`))
+			Eventually(session.Out, 20*time.Second).Should(Say(`mock stemcell automation script executed`))
 		})
 
 		It("extracts the WinRM BOSH powershell script and executes it successfully on the guest VM", func() {
@@ -43,8 +78,7 @@ var _ = Describe("stembuild construct", func() {
 
 			session := helpers.Stembuild(stembuildExecutable, "construct", "-vm-ip", conf.TargetIP, "-vm-username", conf.VMUsername, "-vm-password", conf.VMPassword, "-vcenter-url", conf.VCenterURL, "-vcenter-username", conf.VCenterUsername, "-vcenter-password", conf.VCenterPassword, "-vm-inventory-path", conf.VMInventoryPath)
 
-			Eventually(session, 20*time.Minute).Should(Exit(0))
-			Eventually(session.Out).Should(Say(`Attempting to enable WinRM on the guest vm...WinRm enabled on the guest VM`))
+			Eventually(session.Out, 20*time.Second).Should(Say(`Attempting to enable WinRM on the guest vm...WinRm enabled on the guest VM`))
 
 		})
 
@@ -65,8 +99,17 @@ var _ = Describe("stembuild construct", func() {
 		})
 
 		AfterEach(func() {
+			//powerOnCommand := []string{
+			//	"vm.power",
+			//	fmt.Sprintf("-vm.ipath=%s", conf.VMInventoryPath),
+			//	fmt.Sprintf("-u=%s", vcenterAdminCredentialUrl),
+			//	fmt.Sprintf("-on"),
+			//}
+			//runIgnoringOutput(powerOnCommand)
+			//time.Sleep(15 * time.Second)
 			rm := remotemanager.NewWinRM(conf.TargetIP, conf.VMUsername, conf.VMPassword)
 			err := rm.ExecuteCommand("powershell.exe Remove-Item c:\\provision -recurse")
+
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -88,6 +131,15 @@ var _ = Describe("stembuild construct", func() {
 
 		Eventually(session, 20).Should(Exit(1))
 		Eventually(session.Err).Should(Say("OS version of stembuild and guest OS VM do not match"))
+	})
+
+	It("does not exit when the target VM has not powered off", func() {
+		err := CopyFile(filepath.Join(workingDir, "assets", "LGPO.zip"), filepath.Join(workingDir, "LGPO.zip"))
+		Expect(err).ToNot(HaveOccurred())
+
+		session := helpers.Stembuild(stembuildExecutable, "construct", "-vm-ip", conf.TargetIP, "-vm-username", conf.VMUsername, "-vm-password", conf.VMPassword, "-vcenter-url", conf.VCenterURL, "-vcenter-username", conf.VCenterUsername, "-vcenter-password", conf.VCenterPassword, "-vm-inventory-path", conf.VMInventoryPath)
+
+		Consistently(session, 3*time.Minute).Should(Not(Exit()))
 	})
 
 	AfterEach(func() {
