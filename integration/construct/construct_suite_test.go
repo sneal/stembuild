@@ -13,6 +13,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/cloudfoundry-incubator/stembuild/integration/cleanup_vm"
+
 	"github.com/cloudfoundry-incubator/stembuild/test/helpers"
 
 	"github.com/masterzen/winrm"
@@ -26,8 +28,6 @@ import (
 	_ "github.com/vmware/govmomi/govc/importx"
 	_ "github.com/vmware/govmomi/govc/vm"
 	_ "github.com/vmware/govmomi/govc/vm/snapshot"
-
-	"syscall"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -103,7 +103,7 @@ var _ = BeforeEach(func() {
 		vmSnapshotName,
 	}
 	fmt.Printf("Reverting VM Snapshot: %s", vmSnapshotName)
-	runIgnoringOutput(snapshotCommand)
+	helpers.RunIgnoringOutput(snapshotCommand)
 	time.Sleep(30 * time.Second)
 })
 
@@ -253,8 +253,8 @@ func createVMSnapshot(snapshotName string) {
 		fmt.Sprintf("-u=%s", vcenterAdminCredentialUrl),
 		snapshotName,
 	}
-	fmt.Printf("Creating VM Snapshot: %s", snapshotName)
-	runIgnoringOutput(snapshotCommand)
+	fmt.Printf("Creating VM Snapshot: %s\n", snapshotName)
+	helpers.RunIgnoringOutput(snapshotCommand)
 	time.Sleep(30 * time.Second)
 }
 
@@ -265,7 +265,7 @@ func powerOnVM() {
 		fmt.Sprintf("-u=%s", vcenterAdminCredentialUrl),
 		fmt.Sprintf("-on"),
 	}
-	runIgnoringOutput(powerOnCommand)
+	helpers.RunIgnoringOutput(powerOnCommand)
 }
 
 func createVMWithIP(targetIP, vmNamePrefix, vcenterFolder string) {
@@ -375,54 +375,39 @@ func validatedOVALocation() string {
 	return ovaFile.Name()
 }
 
-func runIgnoringOutput(args []string) int {
-	oldStderr := os.Stderr
-	oldStdout := os.Stdout
-
-	_, w, _ := os.Pipe()
-
-	defer w.Close()
-
-	os.Stderr = w
-	os.Stdout = w
-
-	os.Stderr = os.NewFile(uintptr(syscall.Stderr), "/dev/null")
-
-	exitCode := cli.Run(args)
-
-	os.Stderr = oldStderr
-	os.Stdout = oldStdout
-
-	return exitCode
-}
-
 var _ = SynchronizedAfterSuite(func() {
 	skipCleanup := strings.ToUpper(os.Getenv(SkipCleanupVariable))
 
 	if !existingVM && skipCleanup != "TRUE" {
-		deleteCommand := []string{
-			"vm.destroy",
-			fmt.Sprintf("-vm.ip=%s", conf.TargetIP),
-			fmt.Sprintf("-u=%s", vcenterAdminCredentialUrl),
+		locks := cleanup_vm.TestResources{
+			LockDir:       lockDir,
+			LockPool:      lockPool,
+			LockParentDir: lockParentDir,
 		}
-		Eventually(func() int {
-			return runIgnoringOutput(deleteCommand)
-		}, 3*time.Minute, 10*time.Second).Should(BeZero())
-		fmt.Println("VM destroyed")
-		if lockDir != "" {
-			_, _, err := lockPool.ReleaseLock(lockDir)
-			Expect(err).NotTo(HaveOccurred())
-
-			childItems, err := ioutil.ReadDir(lockParentDir)
-			Expect(err).NotTo(HaveOccurred())
-
-			for _, item := range childItems {
-				if item.IsDir() && strings.HasPrefix(filepath.Base(item.Name()), "pool-resource") {
-					fmt.Printf("Cleaning up temporary pool resource %s\n", item.Name())
-					_ = os.RemoveAll(item.Name())
-				}
-			}
-		}
+		cleanup_vm.Cleanup(vcenterAdminCredentialUrl, conf.TargetIP, locks)
+		//deleteCommand := []string{
+		//	"vm.destroy",
+		//	fmt.Sprintf("-vm.ip=%s", conf.TargetIP),
+		//	fmt.Sprintf("-u=%s", vcenterAdminCredentialUrl),
+		//}
+		//Eventually(func() int {
+		//	return helpers.RunIgnoringOutput(deleteCommand)
+		//}, 3*time.Minute, 10*time.Second).Should(BeZero())
+		//fmt.Println("VM destroyed")
+		//if lockDir != "" {
+		//	_, _, err := lockPool.ReleaseLock(lockDir)
+		//	Expect(err).NotTo(HaveOccurred())
+		//
+		//	childItems, err := ioutil.ReadDir(lockParentDir)
+		//	Expect(err).NotTo(HaveOccurred())
+		//
+		//	for _, item := range childItems {
+		//		if item.IsDir() && strings.HasPrefix(filepath.Base(item.Name()), "pool-resource") {
+		//			fmt.Printf("Cleaning up temporary pool resource %s\n", item.Name())
+		//			_ = os.RemoveAll(item.Name())
+		//		}
+		//	}
+		//}
 	}
 
 	_ = os.RemoveAll(tmpDir)
