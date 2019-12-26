@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -23,6 +24,7 @@ type VMConstruct struct {
 	vmPassword      string
 	winRMEnabler    WinRMEnabler
 	osValidator     OSValidator
+	vmAuthValidator VmAuthenticationValidator
 	messenger       ConstructMessenger
 	poller          Poller
 	versionGetter   VersionGetter
@@ -47,6 +49,7 @@ func NewVMConstruct(
 	guestManager GuestManager,
 	winRMEnabler WinRMEnabler,
 	osValidator OSValidator,
+	vmAuthValidator VmAuthenticationValidator,
 	messenger ConstructMessenger,
 	poller Poller,
 	versionGetter VersionGetter,
@@ -62,6 +65,7 @@ func NewVMConstruct(
 		vmPassword,
 		winRMEnabler,
 		osValidator,
+		vmAuthValidator,
 		messenger,
 		poller,
 		versionGetter,
@@ -94,6 +98,11 @@ type OSValidator interface {
 	Validate(stembuildVersion string) error
 }
 
+//go:generate counterfeiter . VmAuthenticationValidator
+type VmAuthenticationValidator interface {
+	IsValidAuth() (bool, error)
+}
+
 //go:generate counterfeiter . ConstructMessenger
 type ConstructMessenger interface {
 	CreateProvisionDirStarted()
@@ -121,9 +130,16 @@ type Poller interface {
 }
 
 func (c *VMConstruct) PrepareVM() error {
+	validAuth, err := c.vmAuthValidator.IsValidAuth()
+	if err != nil {
+		return err
+	}
+	if !validAuth {
+		return errors.New("asdf")
+	}
 
 	stembuildVersion := c.versionGetter.GetVersion()
-	err := c.osValidator.Validate(stembuildVersion)
+	err = c.osValidator.Validate(stembuildVersion)
 	if err != nil {
 		return err
 	}

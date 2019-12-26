@@ -16,15 +16,16 @@ import (
 
 var _ = Describe("construct_helpers", func() {
 	var (
-		fakeRemoteManager *remotemanagerfakes.FakeRemoteManager
-		vmConstruct       *VMConstruct
-		fakeVcenterClient *constructfakes.FakeIaasClient
-		fakeGuestManager  *constructfakes.FakeGuestManager
-		fakeWinRMEnabler  *constructfakes.FakeWinRMEnabler
-		fakeOSValidator   *constructfakes.FakeOSValidator
-		fakeMessenger     *constructfakes.FakeConstructMessenger
-		fakePoller        *constructfakes.FakePoller
-		fakeVersionGetter *constructfakes.FakeVersionGetter
+		fakeRemoteManager             *remotemanagerfakes.FakeRemoteManager
+		vmConstruct                   *VMConstruct
+		fakeVcenterClient             *constructfakes.FakeIaasClient
+		fakeGuestManager              *constructfakes.FakeGuestManager
+		fakeWinRMEnabler              *constructfakes.FakeWinRMEnabler
+		fakeOSValidator               *constructfakes.FakeOSValidator
+		fakeVmAuthenticationValidator *constructfakes.FakeVmAuthenticationValidator
+		fakeMessenger                 *constructfakes.FakeConstructMessenger
+		fakePoller                    *constructfakes.FakePoller
+		fakeVersionGetter             *constructfakes.FakeVersionGetter
 	)
 
 	BeforeEach(func() {
@@ -33,6 +34,7 @@ var _ = Describe("construct_helpers", func() {
 		fakeGuestManager = &constructfakes.FakeGuestManager{}
 		fakeWinRMEnabler = &constructfakes.FakeWinRMEnabler{}
 		fakeOSValidator = &constructfakes.FakeOSValidator{}
+		fakeVmAuthenticationValidator = &constructfakes.FakeVmAuthenticationValidator{}
 		fakeMessenger = &constructfakes.FakeConstructMessenger{}
 		fakePoller = &constructfakes.FakePoller{}
 		fakeVersionGetter = &constructfakes.FakeVersionGetter{}
@@ -47,6 +49,7 @@ var _ = Describe("construct_helpers", func() {
 			fakeGuestManager,
 			fakeWinRMEnabler,
 			fakeOSValidator,
+			fakeVmAuthenticationValidator,
 			fakeMessenger,
 			fakePoller,
 			fakeVersionGetter,
@@ -60,10 +63,21 @@ var _ = Describe("construct_helpers", func() {
 
 		fakeGuestManager.DownloadFileInGuestReturns(versionBuffer, 3, nil)
 		fakeGuestManager.StartProgramInGuestReturns(0, nil)
+		fakeVmAuthenticationValidator.IsValidAuthReturns(true, nil)
 
 	})
 
 	Describe("PrepareVM", func() {
+		Context("Validates the username and password for the target machine", func() {
+			It("returns failure if the VM Auth Validator returns false", func() {
+				fakeVmAuthenticationValidator.IsValidAuthReturns(false, nil)
+
+				err := vmConstruct.PrepareVM()
+				Expect(err).To(HaveOccurred())
+				Expect(fakeOSValidator.ValidateCallCount()).To(BeZero())
+			})
+		})
+
 		Context("Validates the OS version of the target machine", func() {
 			It("returns failure if the OS Validator returns an error", func() {
 				validationError := errors.New("the OS is wrong")
