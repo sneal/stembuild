@@ -1,14 +1,16 @@
 package iaas_clients
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
-
 	"github.com/cloudfoundry-incubator/stembuild/iaas_cli/iaas_clifakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"io/ioutil"
+	"os"
+	"strings"
+	"time"
 )
 
 var _ = Describe("VcenterClient", func() {
@@ -19,6 +21,7 @@ var _ = Describe("VcenterClient", func() {
 		credentialUrl           string
 		caCertFile              string
 	)
+	const vCenterTimeLayout = "2006-01-02T15:04:05.000Z07:00"
 
 	BeforeEach(func() {
 		runner = &iaas_clifakes.FakeCliRunner{}
@@ -472,6 +475,44 @@ ethernet-0         VirtualE1000e                 DVSwitch: a7 fa 3a 50 a9 72 57 
 			Expect(runner.RunWithOutputArgsForCall(0)).To(Equal(expectedArgs))
 
 			Expect(err).To(MatchError("vcenter_client - failed to get vm info, govc exit code: 1"))
+		})
+	})
+	Describe("hasBeenShutdownByVcenterTask", func() {
+		Context("The VM was shut down by a power off vm task", func() {
+			It("returns true because a vm stop event occurred after a specified time", func() {
+				expectedArgs := []string{"events", "-u", credentialUrl, "-vm.ipath", "validVMPath"}
+				resultMap := map[string]string{"CreatedTime": "2020-02-14T15:56:04.291Z", "Category": "info", "Message": "Task: Power Off virtual machine"}
+				resultJson, _ := json.Marshal(resultMap)
+
+				resultString := strings.Repeat(string(resultJson), 2)
+
+				runner.RunWithOutputReturns(resultString, 0, nil)
+
+				poweredOffTimeStamp, _ := time.Parse(vCenterTimeLayout, "2020-02-14T15:40:04.291Z")
+				isShutdownByTask, err := vcenterClient.hasBeenShutdownByVcenterTask("validVMPath", poweredOffTimeStamp)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(runner.RunWithOutputArgsForCall(0)).To(Equal(expectedArgs))
+				Expect(isShutdownByTask).To(BeTrue())
+			})
+
+		})
+
+		Context("The VM was not shut down by a power off vm task", func() {
+			It("returns false because no vm stop event occurred after a specified time", func() {
+				expectedArgs := []string{"events", "-u", credentialUrl, "-vm.ipath", "validVMPath"}
+				resultMap := map[string]string{"CreatedTime": "2020-02-14T15:56:04.291Z", "Category": "info", "Message": "Task:  Power Off virtual machine"}
+				resultJson, _ := json.Marshal(resultMap)
+
+
+				runner.RunWithOutputReturns(string(resultJson), 0, nil)
+				poweredOffTimeStamp, _ := time.Parse(vCenterTimeLayout, "2020-02-14T15:59:04.291Z")
+				isShutdownByTask, err := vcenterClient.hasBeenShutdownByVcenterTask("validVMPath", poweredOffTimeStamp)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(runner.RunWithOutputArgsForCall(0)).To(Equal(expectedArgs))
+				Expect(isShutdownByTask).To(BeFalse())
+			})
 		})
 	})
 

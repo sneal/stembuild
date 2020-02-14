@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/cloudfoundry-incubator/stembuild/iaas_cli"
 )
@@ -210,6 +211,36 @@ func (c *VcenterClient) IsPoweredOff(vmInventoryPath string) (bool, error) {
 
 	if strings.Contains(out, "poweredOff") {
 		return true, nil
+	}
+
+	return false, nil
+}
+
+func (c *VcenterClient) hasBeenShutdownByVcenterTask(vmInventoryPath string, thresholdTime time.Time) (bool, error) {
+	type vCenterEvent struct {
+		CreatedTime string
+		Category string
+		Message string
+	}
+
+	var ourvCenterEvent vCenterEvent
+	args := c.buildGovcCommand("events", "-vm.ipath", vmInventoryPath)
+	out, _, _ := c.Runner.RunWithOutput(args)
+
+	fmt.Println(out)
+	err := json.Unmarshal([]byte(out), &ourvCenterEvent)
+	if err != nil {
+		fmt.Printf("error: %s\n",err)
+	}
+	fmt.Println(ourvCenterEvent)
+	//// Mon Jan 2 15:04:05 -0700 MST 2006
+	const vCenterTimeLayout = "2006-01-02T15:04:05.000Z07:00"
+	shutdownTime, _ := time.Parse(vCenterTimeLayout, ourvCenterEvent.CreatedTime)
+
+	if strings.Contains(ourvCenterEvent.Message, "Task: Power Off virtual machine") {
+		if shutdownTime.After(thresholdTime) {
+			return true, nil
+		}
 	}
 
 	return false, nil
