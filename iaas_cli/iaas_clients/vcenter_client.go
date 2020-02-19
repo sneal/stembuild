@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"regexp"
@@ -216,29 +217,39 @@ func (c *VcenterClient) IsPoweredOff(vmInventoryPath string) (bool, error) {
 	return false, nil
 }
 
-func (c *VcenterClient) hasBeenShutdownByVcenterTask(vmInventoryPath string, thresholdTime time.Time) (bool, error) {
+func (c *VcenterClient) HasBeenShutdownByVcenterTask(vmInventoryPath string, thresholdTime time.Time) (bool, error) {
 	type vCenterEvent struct {
 		CreatedTime string
-		Category string
-		Message string
+		Category    string
+		Message     string
 	}
 
-	var ourvCenterEvent vCenterEvent
-	args := c.buildGovcCommand("events", "-vm.ipath", vmInventoryPath)
-	out, _, _ := c.Runner.RunWithOutput(args)
-
-	fmt.Println(out)
-	err := json.Unmarshal([]byte(out), &ourvCenterEvent)
+	args := c.buildGovcCommand("events", "-type", "VmStoppingEvent", "-type", "VmGuestShutdownEvent", "-json", vmInventoryPath)
+	out, exitCode, err := c.Runner.RunWithOutput(args)
 	if err != nil {
-		fmt.Printf("error: %s\n",err)
+		return false, fmt.Errorf("failed to execute govc: %w", err)
 	}
-	fmt.Println(ourvCenterEvent)
-	//// Mon Jan 2 15:04:05 -0700 MST 2006
-	const vCenterTimeLayout = "2006-01-02T15:04:05.000Z07:00"
-	shutdownTime, _ := time.Parse(vCenterTimeLayout, ourvCenterEvent.CreatedTime)
+	if exitCode != 0 {
+		return false, fmt.Errorf("govc returned exit code %v", exitCode)
+	}
 
-	if strings.Contains(ourvCenterEvent.Message, "Task: Power Off virtual machine") {
-		if shutdownTime.After(thresholdTime) {
+	decoder := json.NewDecoder(strings.NewReader(out))
+
+	for {
+		var event vCenterEvent
+		err := decoder.Decode(&event)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return false, fmt.Errorf("failed to parse govc json response %w", err)
+		}
+		eventTime, err := time.Parse(time.RFC3339, event.CreatedTime)
+		if err != nil {
+			return false, fmt.Errorf("failed to parse govc event timestamp: %w", err)
+		}
+
+		if eventTime.After(thresholdTime) {
 			return true, nil
 		}
 	}

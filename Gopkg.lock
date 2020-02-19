@@ -380,7 +380,6 @@
     "github.com/concourse/pool-resource/out",
     "github.com/golang/mock/gomock",
     "github.com/google/subcommands",
-    "github.com/google/uuid",
     "github.com/masterzen/winrm",
     "github.com/onsi/ginkgo",
     "github.com/onsi/ginkgo/extensions/table",

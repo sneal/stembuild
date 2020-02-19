@@ -3,11 +3,26 @@ package constructfakes
 
 import (
 	"sync"
+	"time"
 
 	"github.com/cloudfoundry-incubator/stembuild/construct"
 )
 
 type FakeIaasClient struct {
+	HasBeenShutdownByVcenterTaskStub        func(string, time.Time) (bool, error)
+	hasBeenShutdownByVcenterTaskMutex       sync.RWMutex
+	hasBeenShutdownByVcenterTaskArgsForCall []struct {
+		arg1 string
+		arg2 time.Time
+	}
+	hasBeenShutdownByVcenterTaskReturns struct {
+		result1 bool
+		result2 error
+	}
+	hasBeenShutdownByVcenterTaskReturnsOnCall map[int]struct {
+		result1 bool
+		result2 error
+	}
 	IsPoweredOffStub        func(string) (bool, error)
 	isPoweredOffMutex       sync.RWMutex
 	isPoweredOffArgsForCall []struct {
@@ -85,6 +100,70 @@ type FakeIaasClient struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeIaasClient) HasBeenShutdownByVcenterTask(arg1 string, arg2 time.Time) (bool, error) {
+	fake.hasBeenShutdownByVcenterTaskMutex.Lock()
+	ret, specificReturn := fake.hasBeenShutdownByVcenterTaskReturnsOnCall[len(fake.hasBeenShutdownByVcenterTaskArgsForCall)]
+	fake.hasBeenShutdownByVcenterTaskArgsForCall = append(fake.hasBeenShutdownByVcenterTaskArgsForCall, struct {
+		arg1 string
+		arg2 time.Time
+	}{arg1, arg2})
+	fake.recordInvocation("HasBeenShutdownByVcenterTask", []interface{}{arg1, arg2})
+	fake.hasBeenShutdownByVcenterTaskMutex.Unlock()
+	if fake.HasBeenShutdownByVcenterTaskStub != nil {
+		return fake.HasBeenShutdownByVcenterTaskStub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	fakeReturns := fake.hasBeenShutdownByVcenterTaskReturns
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeIaasClient) HasBeenShutdownByVcenterTaskCallCount() int {
+	fake.hasBeenShutdownByVcenterTaskMutex.RLock()
+	defer fake.hasBeenShutdownByVcenterTaskMutex.RUnlock()
+	return len(fake.hasBeenShutdownByVcenterTaskArgsForCall)
+}
+
+func (fake *FakeIaasClient) HasBeenShutdownByVcenterTaskCalls(stub func(string, time.Time) (bool, error)) {
+	fake.hasBeenShutdownByVcenterTaskMutex.Lock()
+	defer fake.hasBeenShutdownByVcenterTaskMutex.Unlock()
+	fake.HasBeenShutdownByVcenterTaskStub = stub
+}
+
+func (fake *FakeIaasClient) HasBeenShutdownByVcenterTaskArgsForCall(i int) (string, time.Time) {
+	fake.hasBeenShutdownByVcenterTaskMutex.RLock()
+	defer fake.hasBeenShutdownByVcenterTaskMutex.RUnlock()
+	argsForCall := fake.hasBeenShutdownByVcenterTaskArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeIaasClient) HasBeenShutdownByVcenterTaskReturns(result1 bool, result2 error) {
+	fake.hasBeenShutdownByVcenterTaskMutex.Lock()
+	defer fake.hasBeenShutdownByVcenterTaskMutex.Unlock()
+	fake.HasBeenShutdownByVcenterTaskStub = nil
+	fake.hasBeenShutdownByVcenterTaskReturns = struct {
+		result1 bool
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeIaasClient) HasBeenShutdownByVcenterTaskReturnsOnCall(i int, result1 bool, result2 error) {
+	fake.hasBeenShutdownByVcenterTaskMutex.Lock()
+	defer fake.hasBeenShutdownByVcenterTaskMutex.Unlock()
+	fake.HasBeenShutdownByVcenterTaskStub = nil
+	if fake.hasBeenShutdownByVcenterTaskReturnsOnCall == nil {
+		fake.hasBeenShutdownByVcenterTaskReturnsOnCall = make(map[int]struct {
+			result1 bool
+			result2 error
+		})
+	}
+	fake.hasBeenShutdownByVcenterTaskReturnsOnCall[i] = struct {
+		result1 bool
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeIaasClient) IsPoweredOff(arg1 string) (bool, error) {
@@ -413,6 +492,8 @@ func (fake *FakeIaasClient) WaitForExitReturnsOnCall(i int, result1 int, result2
 func (fake *FakeIaasClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
+	fake.hasBeenShutdownByVcenterTaskMutex.RLock()
+	defer fake.hasBeenShutdownByVcenterTaskMutex.RUnlock()
 	fake.isPoweredOffMutex.RLock()
 	defer fake.isPoweredOffMutex.RUnlock()
 	fake.makeDirectoryMutex.RLock()

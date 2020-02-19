@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"time"
 	"unicode/utf16"
@@ -85,6 +86,7 @@ type IaasClient interface {
 	Start(vmInventoryPath, username, password, command string, args ...string) (string, error)
 	WaitForExit(vmInventoryPath, username, password, pid string) (int, error)
 	IsPoweredOff(vmInventoryPath string) (bool, error)
+	HasBeenShutdownByVcenterTask(vmInventoryPath string, thresholdTime time.Time) (bool, error)
 }
 
 //go:generate counterfeiter . WinRMEnabler
@@ -175,7 +177,7 @@ func (c *VMConstruct) PrepareVM() error {
 	c.messenger.ExecuteScriptSucceeded()
 	c.messenger.WinRMDisconnectedForReboot()
 
-	err = c.isPoweredOff(time.Minute)
+	err = c.waitForShutdown(time.Minute)
 	if err != nil {
 		return err
 	}
@@ -222,7 +224,8 @@ func (c *VMConstruct) executeSetupScript(stembuildVersion string) error {
 	return err
 }
 
-func (c *VMConstruct) isPoweredOff(duration time.Duration) error {
+func (c *VMConstruct) waitForShutdown(duration time.Duration) error {
+	thresholdTime := time.Now()
 	err := c.poller.Poll(duration, func() (bool, error) {
 		isPoweredOff, err := c.Client.IsPoweredOff(c.vmInventoryPath)
 
@@ -238,6 +241,16 @@ func (c *VMConstruct) isPoweredOff(duration time.Duration) error {
 	if err != nil {
 		return err
 	}
+
+	isShutdownByVcenterTask, err := c.Client.HasBeenShutdownByVcenterTask(c.vmInventoryPath, thresholdTime)
+	if isShutdownByVcenterTask {
+		return errors.New("VM was shutdown before sysprep completed")
+	}
+	if err != nil {
+		panic("what heppens when checking fails?")
+	}
+
+	//if hasbeenshutoffbyvcenter log warning, if not log
 
 	c.messenger.ShutdownCompleted()
 	return nil

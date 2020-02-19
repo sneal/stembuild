@@ -292,9 +292,49 @@ var _ = Describe("construct_helpers", func() {
 			})
 
 		})
-		Describe("can check if vm is rebooting", func() {
-			It("runs every minute and returns successfully if polling succeeds", func() {
+
+		FDescribe("can wait for the vm to be shut down by sysprep", func() {
+			It("polls every minute, logging that a restart is in progress if the VM is not powered off", func() {
 				fakePoller.PollReturns(nil)
+
+				fakeVcenterClient.HasBeenShutdownByVcenterTaskReturns(false, nil)
+
+				fakeVcenterClient.IsPoweredOffReturnsOnCall(0, false, nil)
+				fakeVcenterClient.IsPoweredOffReturnsOnCall(1, true, nil)
+				fakeVcenterClient.IsPoweredOffReturnsOnCall(2, false, errors.New("checking for powered off is hard"))
+
+				err := vmConstruct.PrepareVM()
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(fakePoller.PollCallCount()).To(Equal(1))
+				pollDuration, pollFunc := fakePoller.PollArgsForCall(0)
+
+				Expect(pollDuration).To(Equal(1 * time.Minute))
+
+				Expect(fakeVcenterClient.IsPoweredOffCallCount()).To(Equal(0))
+				Expect(fakeMessenger.RestartInProgressCallCount()).To(Equal(0))
+
+				isPoweredOff, err := pollFunc()
+				Expect(isPoweredOff).To(BeFalse())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(fakeMessenger.RestartInProgressCallCount()).To(Equal(1))
+
+				isPoweredOff, err = pollFunc()
+				Expect(isPoweredOff).To(BeTrue())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(fakeMessenger.RestartInProgressCallCount()).To(Equal(2))
+
+				isPoweredOff, err = pollFunc()
+				Expect(err).To(MatchError("checking for powered off is hard"))
+				Expect(fakeMessenger.RestartInProgressCallCount()).To(Equal(2))
+
+				Expect(fakeVcenterClient.IsPoweredOffCallCount()).To(Equal(3))
+			})
+
+			It("polls every minute and returns after logging that shutdown is complete, if it was not shutdown via vcenter", func() {
+				fakePoller.PollReturns(nil)
+
+				fakeVcenterClient.HasBeenShutdownByVcenterTaskReturns(false, nil)
 
 				fakeVcenterClient.IsPoweredOffReturnsOnCall(0, false, nil)
 				fakeVcenterClient.IsPoweredOffReturnsOnCall(1, true, nil)
@@ -329,13 +369,37 @@ var _ = Describe("construct_helpers", func() {
 				Expect(fakeVcenterClient.IsPoweredOffCallCount()).To(Equal(3))
 			})
 
+			It("warns the user if the vm was shut down via the vcenter", func() {
+				fakePoller.PollReturns(nil)
+				fakeVcenterClient.IsPoweredOffReturns(true, nil)
+				fakeVcenterClient.HasBeenShutdownByVcenterTaskReturns(true, nil)
+
+				timeOfCall := time.Now()
+				err := vmConstruct.PrepareVM()
+
+				Expect(fakeVcenterClient.HasBeenShutdownByVcenterTaskCallCount()).To(Equal(1))
+
+				path, threshholdTime := fakeVcenterClient.HasBeenShutdownByVcenterTaskArgsForCall(0)
+				Expect(path).To(Equal("fakeVmPath"))
+				Expect(threshholdTime).To(BeTemporally("~", timeOfCall, 100 * time.Millisecond))
+
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(ContainSubstring("VM was shutdown before sysprep completed")))
+			})
+
 			It("returns failure when it cannot determine vm power state", func() {
 				fakePoller.PollReturns(errors.New("polling is hard"))
 
 				Expect(vmConstruct.PrepareVM()).To(MatchError("polling is hard"))
 				Expect(fakeMessenger.ShutdownCompletedCallCount()).To(Equal(0))
 			})
+		})
 
+		FDescribe("can check if a vm shutdown was shutdown by a vcenter task", func() {
+
+			It("logs that the vm shutdown safely if it was not shutdown via vcenter task", func() {
+
+			})
 		})
 	})
 })

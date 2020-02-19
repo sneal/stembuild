@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 	"io/ioutil"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -477,42 +476,111 @@ ethernet-0         VirtualE1000e                 DVSwitch: a7 fa 3a 50 a9 72 57 
 			Expect(err).To(MatchError("vcenter_client - failed to get vm info, govc exit code: 1"))
 		})
 	})
-	Describe("hasBeenShutdownByVcenterTask", func() {
-		Context("The VM was shut down by a power off vm task", func() {
-			It("returns true because a vm stop event occurred after a specified time", func() {
-				expectedArgs := []string{"events", "-u", credentialUrl, "-vm.ipath", "validVMPath"}
-				resultMap := map[string]string{"CreatedTime": "2020-02-14T15:56:04.291Z", "Category": "info", "Message": "Task: Power Off virtual machine"}
-				resultJson, _ := json.Marshal(resultMap)
+	FDescribe("HasBeenShutdownByVcenterTask", func() {
+		var expectedGovcArgs []string
+		var thresholdTime time.Time
+		BeforeEach(func() {
+			thresholdTime = time.Now()
+			expectedGovcArgs = []string{"events", "-u", credentialUrl,"-type","VmStoppingEvent","-type","VmGuestShutdownEvent","-json", "validVMPath"}
+		})
+		It("returns true if a VmStopping or VmGuestShutdown event occurred after a specified time", func() {
+			beforeTime := thresholdTime.Add(-1 * time.Hour)
+			afterTime := thresholdTime.Add(time.Hour)
 
-				resultString := strings.Repeat(string(resultJson), 2)
+			resultMaps := []map[string]string{
+				{"CreatedTime": beforeTime.Format(time.RFC3339Nano), "Category": "info", "Message": "message does not matter"},
+				{"CreatedTime": afterTime.Format(time.RFC3339Nano), "Category": "info", "Message": "message does not matter"},
+			}
+			resultJsons := ""
 
-				runner.RunWithOutputReturns(resultString, 0, nil)
+			for _, resultMap := range resultMaps {
+				resultJson, _ :=json.Marshal(resultMap)
+				resultJsons += string(resultJson)
+			}
 
-				poweredOffTimeStamp, _ := time.Parse(vCenterTimeLayout, "2020-02-14T15:40:04.291Z")
-				isShutdownByTask, err := vcenterClient.hasBeenShutdownByVcenterTask("validVMPath", poweredOffTimeStamp)
+			runner.RunWithOutputReturns(resultJsons, 0, nil)
 
-				Expect(err).NotTo(HaveOccurred())
-				Expect(runner.RunWithOutputArgsForCall(0)).To(Equal(expectedArgs))
-				Expect(isShutdownByTask).To(BeTrue())
-			})
+			isShutdownByTask, err := vcenterClient.HasBeenShutdownByVcenterTask("validVMPath", thresholdTime)
 
+			Expect(err).NotTo(HaveOccurred())
+			Expect(runner.RunWithOutputArgsForCall(0)).To(Equal(expectedGovcArgs))
+			Expect(isShutdownByTask).To(BeTrue())
 		})
 
-		Context("The VM was not shut down by a power off vm task", func() {
-			It("returns false because no vm stop event occurred after a specified time", func() {
-				expectedArgs := []string{"events", "-u", credentialUrl, "-vm.ipath", "validVMPath"}
-				resultMap := map[string]string{"CreatedTime": "2020-02-14T15:56:04.291Z", "Category": "info", "Message": "Task:  Power Off virtual machine"}
-				resultJson, _ := json.Marshal(resultMap)
+		It("returns false if no VmStopping or VmGuestShutdown event occurred after a specified time", func() {
+			beforeTime := thresholdTime.Add(-1 * time.Hour)
+			anotherBeforeTime := thresholdTime.Add(-2 * time.Hour)
+			resultMaps := []map[string]string{
+				{"CreatedTime": beforeTime.Format(time.RFC3339Nano), "Category": "info", "Message": "message does not matter"},
+				{"CreatedTime": anotherBeforeTime.Format(time.RFC3339Nano), "Category": "info", "Message": "message does not matter"},
+			}
+			resultJsons := ""
 
+			for _, resultMap := range resultMaps {
+				resultJson, _ :=json.Marshal(resultMap)
+				resultJsons += string(resultJson)
+			}
 
-				runner.RunWithOutputReturns(string(resultJson), 0, nil)
-				poweredOffTimeStamp, _ := time.Parse(vCenterTimeLayout, "2020-02-14T15:59:04.291Z")
-				isShutdownByTask, err := vcenterClient.hasBeenShutdownByVcenterTask("validVMPath", poweredOffTimeStamp)
+			runner.RunWithOutputReturns(resultJsons, 0, nil)
 
-				Expect(err).NotTo(HaveOccurred())
-				Expect(runner.RunWithOutputArgsForCall(0)).To(Equal(expectedArgs))
-				Expect(isShutdownByTask).To(BeFalse())
-			})
+			isShutdownByTask, err := vcenterClient.HasBeenShutdownByVcenterTask("validVMPath", thresholdTime)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(runner.RunWithOutputArgsForCall(0)).To(Equal(expectedGovcArgs))
+			Expect(isShutdownByTask).To(BeFalse())
+		})
+
+		It("returns an error if executing govc fails", func() {
+			runner.RunWithOutputReturns("",0, errors.New("running things hard"))
+
+			_, err := vcenterClient.HasBeenShutdownByVcenterTask("validVMPath", thresholdTime)
+
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(ContainSubstring("failed to execute govc")))
+			Expect(err).To(MatchError(ContainSubstring("running things hard")))
+		})
+
+		It("returns an error if govc has a non-zero exit code", func() {
+			runner.RunWithOutputReturns("",17,nil)
+
+			_, err := vcenterClient.HasBeenShutdownByVcenterTask("validVMPath", thresholdTime)
+
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("govc returned exit code 17"))
+		})
+
+		It("returns an error if it fails to parse json properly", func() {
+			invalidJSON := "{{{{{{{}"
+			runner.RunWithOutputReturns(invalidJSON,0,nil)
+
+			_, err := vcenterClient.HasBeenShutdownByVcenterTask("validVMPath", thresholdTime)
+
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(ContainSubstring("failed to parse govc json response")))
+			Expect(err).To(MatchError(ContainSubstring("invalid character '{' looking for beginning of object key string")))
+		})
+
+		It("returns an error if it cannot parse govc event timestamps", func() {
+
+			invalidTimeResponseMaps := []map[string]string{
+				{"CreatedTime": "NOT_A_VALID_TIMESTAMP", "Category": "info", "Message": "message does not matter"},
+				{"CreatedTime": "ALSO_NOT_A_VALID_TIMESTAMP", "Category": "info", "Message": "message does not matter"},
+			}
+
+			resultJsons := ""
+
+			for _, resultMap := range invalidTimeResponseMaps {
+				resultJson, _ :=json.Marshal(resultMap)
+				resultJsons += string(resultJson)
+			}
+
+			runner.RunWithOutputReturns(resultJsons,0,nil)
+
+			_, err := vcenterClient.HasBeenShutdownByVcenterTask("validVMPath", thresholdTime)
+
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(ContainSubstring("failed to parse govc event timestamp")))
+			Expect(err).To(MatchError(ContainSubstring("parsing time \"NOT_A_VALID_TIMESTAMP\" as \"2006-01-02T15:04:05Z07:00\": cannot parse \"NOT_A_VALID_TIMESTAMP\" as \"2006\"")))
 		})
 	})
 
