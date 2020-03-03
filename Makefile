@@ -21,7 +21,7 @@ update :
 	dep ensure -v
 
 integration : generate
-	ginkgo -r -v -randomizeAllSpecs integration
+	ginkgo -r -v -randomizeAllSpecs integration -focus="integration/construct" --regexScansFilePath=true
 
 integration-badger : generate
 	ginkgo -r -v -randomizeAllSpecs -untilItFails integration
