@@ -355,12 +355,9 @@ func upgradeVMwareTools(targetIP, vmNamePrefix, vcenterFolder string) {
 	exitCode := 1
 
 	for exitCode != 0 {
-		time.Sleep(10 * time.Second)
+		time.Sleep(5 * time.Second)
 		exitCode = cli.Run(opts)
 	}
-
-	Expect(exitCode).To(BeZero())
-
 }
 
 func validatedOVALocation() string {
