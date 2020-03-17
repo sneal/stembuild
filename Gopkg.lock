@@ -243,7 +243,7 @@
   version = "v0.8.1"
 
 [[projects]]
-  digest = "1:e85aa181d59228dad43dc9b62f29fe32d12d7a26802037b21a642ec37e83615d"
+  digest = "1:b031fd405c597b429860ad4d39fffb298d104ddec27cfe2de5fad7e7069dd62f"
   name = "github.com/vmware/govmomi"
   packages = [
     ".",
@@ -256,6 +256,7 @@
     "govc/flags",
     "govc/host/esxcli",
     "govc/importx",
+    "govc/library",
     "govc/object",
     "govc/vm",
     "govc/vm/guest",
@@ -277,7 +278,10 @@
     "task",
     "units",
     "vapi/internal",
+    "vapi/library",
+    "vapi/library/finder",
     "vapi/rest",
+    "vapi/vcenter",
     "view",
     "vim25",
     "vim25/debug",
@@ -290,8 +294,8 @@
     "vmdk",
   ]
   pruneopts = "UT"
-  revision = "4514987f2ddb8875c44cff1d5a24c59425fa6b92"
-  version = "v0.20.1"
+  revision = "e7df0c1118c15c0b35fe08f183ca084269ea6542"
+  version = "v0.22.2"
 
 [[projects]]
   branch = "master"
@@ -394,6 +398,7 @@
     "github.com/vmware/govmomi/govc/device/cdrom",
     "github.com/vmware/govmomi/govc/export",
     "github.com/vmware/govmomi/govc/importx",
+    "github.com/vmware/govmomi/govc/library",
     "github.com/vmware/govmomi/govc/object",
     "github.com/vmware/govmomi/govc/vm",
     "github.com/vmware/govmomi/govc/vm/guest",
