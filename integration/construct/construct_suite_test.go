@@ -25,7 +25,9 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/vmware/govmomi/govc/cli"
+	_ "github.com/vmware/govmomi/govc/device"
 	_ "github.com/vmware/govmomi/govc/importx"
+	_ "github.com/vmware/govmomi/govc/library"
 	_ "github.com/vmware/govmomi/govc/vm"
 	_ "github.com/vmware/govmomi/govc/vm/guest"
 	_ "github.com/vmware/govmomi/govc/vm/snapshot"
@@ -70,6 +72,8 @@ const (
 	vcenterStembuildPasswordVariable  = "VCENTER_STEMBUILD_PASSWORD"
 	StembuildVersionVariable          = "STEMBUILD_VERSION"
 	VmSnapshotName                    = "integration-test-snapshot"
+	vcenterLibraryTemplatePath        = "/bosh_windows/construct-integration-base"
+	vcenterCustomizationSpec          = "Stembuild-Base-VM"
 )
 
 var (
@@ -138,7 +142,7 @@ func envMustExist(variableName string) string {
 func envMustExistWithDescription(variableName, description string) string {
 	result := os.Getenv(variableName)
 	if result == "" {
-		Fail(fmt.Sprintf("%s %s must be set", description, variableName))
+		Fail(fmt.Sprintf("%s: %s must be set", description, variableName))
 	}
 
 	return result
@@ -231,9 +235,11 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 			fmt.Println("Finding available IP...")
 			targetIP = claimAvailableIP()
 		}
-		createVMWithIP(targetIP, vmNamePrefix, vcenterFolder)
+		// createVMWithIP(targetIP, vmNamePrefix, vcenterFolder)
+		// upgradeVMwareTools(targetIP, vmNamePrefix, vcenterFolder)
 
-		upgradeVMwareTools(targetIP, vmNamePrefix, vcenterFolder)
+		deployVmFromLibrary(targetIP, vmNamePrefix)
+		powerOnVM()
 
 		createVMSnapshot(VmSnapshotName)
 	} else {
@@ -280,6 +286,7 @@ func createVMSnapshot(snapshotName string) {
 }
 
 func powerOnVM() {
+	Expect(conf.VMInventoryPath).NotTo(BeNil(), "VM Inventory Path not set. VM may not have been created.")
 	powerOnCommand := []string{
 		"vm.power",
 		fmt.Sprintf("-vm.ipath=%s", conf.VMInventoryPath),
@@ -336,6 +343,59 @@ func createVMWithIP(targetIP, vmNamePrefix, vcenterFolder string) {
 	exitCode := cli.Run(opts)
 	Expect(exitCode).To(BeZero())
 
+}
+
+func deployVmFromLibrary(targetIP string, vmNamePrefix string) {
+	failureDescription := "when deploying a VM from library, because a variable isn't set"
+
+	vmFolder := envMustExistWithDescription(VMFolderVariable, failureDescription)
+	conf.NetworkGateway = envMustExistWithDescription(NetworkGatewayVariable, failureDescription)
+	conf.SubnetMask = envMustExistWithDescription(SubnetMaskVariable, failureDescription)
+	//vMNetwork := envMustExistWithDescription(VMNetworkVariable, failureDescription)
+	conf.TargetIP = targetIP
+	fmt.Printf("Target ip is %s\n", targetIP)
+
+	vmNameSuffix := strings.Split(targetIP, ".")[3]
+	conf.VMName = fmt.Sprintf("%s%s", vmNamePrefix, vmNameSuffix)
+
+	conf.VMInventoryPath = strings.Join([]string{vmFolder, conf.VMName}, "/")
+
+	deployArgs := []string{
+		"library.deploy",
+		fmt.Sprintf("-u=%s", vcenterAdminCredentialUrl),
+		fmt.Sprintf("--folder=%s", vmFolder),
+		vcenterLibraryTemplatePath,
+		conf.VMName,
+	}
+
+	setIpArgs := []string{
+		"vm.customize",
+		fmt.Sprintf("-u=%s", vcenterAdminCredentialUrl),
+		fmt.Sprintf("-vm.ipath=%s", conf.VMInventoryPath),
+		fmt.Sprintf("-gateway=%s", conf.NetworkGateway),
+		fmt.Sprintf("-ip=%s", conf.TargetIP),
+		fmt.Sprintf("-netmask=%s", conf.SubnetMask),
+		vcenterCustomizationSpec,
+	}
+
+	connectNICArgs := []string{
+		"device.connect",
+		fmt.Sprintf("-u=%s", vcenterAdminCredentialUrl),
+		fmt.Sprintf("-vm.ipath=%s", conf.VMInventoryPath),
+		"ethernet-0",
+	}
+
+	fmt.Printf("running library.deploy \n")
+	exitCode := cli.Run(deployArgs)
+	Expect(exitCode).To(BeZero())
+
+	fmt.Printf("running vm.customize to set IP address\n")
+	exitCode = cli.Run(setIpArgs)
+	Expect(exitCode).To(BeZero())
+
+	fmt.Printf("ensuring NIC is connected on the vm\n")
+	exitCode = cli.Run(connectNICArgs)
+	Expect(exitCode).To(BeZero())
 }
 
 func upgradeVMwareTools(targetIP, vmNamePrefix, vcenterFolder string) {
