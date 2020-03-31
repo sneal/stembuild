@@ -3,17 +3,20 @@ package construct_test
 import (
 	"context"
 	"fmt"
-	"github.com/vmware/govmomi/find"
-	"github.com/vmware/govmomi/vim25"
-	"github.com/vmware/govmomi/vim25/methods"
-	"github.com/vmware/govmomi/vim25/soap"
-	"github.com/vmware/govmomi/vim25/types"
 	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"time"
+
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/methods"
+	"github.com/vmware/govmomi/vim25/soap"
+	"github.com/vmware/govmomi/vim25/types"
 
 	"github.com/cloudfoundry-incubator/stembuild/test/helpers"
 	. "github.com/onsi/ginkgo"
@@ -71,7 +74,18 @@ func instantCloneVm(sourceVmInventoryPath, targetVmName string) error {
 
 	vim25Client, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
-		return fmt.Errorf("error building vim25 client: %s")
+		return fmt.Errorf("error building vim25 client: %s", err)
+	}
+	govmomiClient := govmomi.Client{
+		Client:         vim25Client,
+		SessionManager: session.NewManager(vim25Client),
+	}
+
+	creds := url.UserPassword(vCenterUsername, vCenterPassword)
+
+	err = govmomiClient.Login(ctx, creds)
+	if err != nil {
+		return fmt.Errorf("error logging in to vcenter: %s", err)
 	}
 
 	// get vm to clone
@@ -80,22 +94,29 @@ func instantCloneVm(sourceVmInventoryPath, targetVmName string) error {
 
 	vm, err := finder.VirtualMachine(ctx, sourceVmInventoryPath)
 	if err != nil {
-		return fmt.Errorf("could not find VM: %s")
+		return fmt.Errorf("could not find VM: %s", err)
 	}
 
 	//cloneConfig :=
+	//ipAddressConfig := []types.BaseOptionValue{
+	//	&types.OptionValue{
+	//		Key: "ipAddress",
+	//		Value: "10.85.81.5",
+	//	},
+	//}
 	req := types.InstantClone_Task{
 		This: vm.Reference(),
 		Spec: types.VirtualMachineInstantCloneSpec{
 			Name:     targetVmName,
 			Location: types.VirtualMachineRelocateSpec{},
+			//Config: ipAddressConfig,
 		},
 	}
 
 	// v.c is off a client
 	_, err = methods.InstantClone_Task(ctx, vim25Client, &req)
 	if err != nil {
-		return fmt.Errorf("failed to instant-clone: %s")
+		return fmt.Errorf("failed to instant-clone: %s", err)
 	}
 
 	//return NewTask(v.c, res.Returnval), nil
@@ -115,7 +136,7 @@ var _ = Describe("stembuild construct", func() {
 	const constructOutputTimeout = 60 * time.Second
 	Context("run successfully", func() {
 
-		FIt("successfully exits when vm becomes powered off", func() {
+		It("successfully exits when vm becomes powered off", func() {
 			err := CopyFile(filepath.Join(workingDir, "assets", "LGPO.zip"), filepath.Join(workingDir, "LGPO.zip"))
 			Expect(err).ToNot(HaveOccurred())
 
@@ -160,7 +181,7 @@ var _ = Describe("stembuild construct", func() {
 			Eventually(session.Out).Should(Say(`mock stemcell automation script executed`))
 		})
 
-		It("successfully runs even when a user has logged in", func() {
+		FIt("successfully runs even when a user has logged in", func() {
 			//endpoint := winrm.NewEndpoint(conf.TargetIP, 5985, false, true, nil, nil, nil, 0)
 			// new client -> visually: not logged in. test behavior: ?
 			//client, err := winrm.NewClient(endpoint, conf.VMUsername, conf.VMPassword)
@@ -178,23 +199,29 @@ var _ = Describe("stembuild construct", func() {
 			//
 			// can we login some other way (send Ctrl-Alt-Del, etc.): govc?
 
-			Fail("call Instant clone vm correctly, and stembuild against a vsphere 6.7 environment")
+			//Fail("call Instant clone vm correctly, and stembuild against a vsphere 6.7 environment")
 
-			instantCloneVm("", "")
+			//err := instantCloneVm("/private/vm/cove/stembuild_base_vm_2019_22", "cloned-vm-from-test")
+			//Expect(err).NotTo(HaveOccurred())
 
+			//Fail("cloned VM")
+
+			fmt.Printf("please suspend source vm\n")
+			time.Sleep(30 * time.Second)
 
 			// run normal stembuild construct command, like we do in prev. test
 			err := CopyFile(filepath.Join(workingDir, "assets", "LGPO.zip"), filepath.Join(workingDir, "LGPO.zip"))
 			Expect(err).ToNot(HaveOccurred())
 
 			session := helpers.Stembuild(stembuildExecutable, "construct",
-				"-vm-ip", conf.TargetIP,
-				"-vm-username", conf.VMUsername,
-				"-vm-password", conf.VMPassword,
-				"-vcenter-url", conf.VCenterURL,
-				"-vcenter-username", conf.VCenterUsername,
-				"-vcenter-password", conf.VCenterPassword,
-				"-vm-inventory-path", conf.VMInventoryPath)
+				"-vm-ip", "10.85.81.22",
+				"-vm-username", "Pivotal",
+				"-vm-password", "password123!",
+				"-vcenter-url", "vcenter.wild.cf-app.com",
+				"-vcenter-username", vCenterUsername,
+				"-vcenter-password", vCenterPassword,
+				"-vm-inventory-path", "/private/vm/cove/stembuild_base_vm_2019_22")
+			//"-vm-inventory-path", "/private/vm/cove/cloned-vm-from-test")
 
 			// assuming old, pre-story state
 			// expect timeout

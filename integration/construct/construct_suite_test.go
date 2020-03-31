@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/cloudfoundry-incubator/stembuild/test/helpers"
+	"github.com/masterzen/winrm"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -12,10 +14,6 @@ import (
 	"testing"
 	"text/template"
 	"time"
-
-	"github.com/cloudfoundry-incubator/stembuild/test/helpers"
-
-	"github.com/masterzen/winrm"
 
 	"github.com/concourse/pool-resource/out"
 
