@@ -151,7 +151,6 @@ var _ = Describe("Messenger", func() {
 			Expect(buf).To(gbytes.Say("Attempting to logout any remote users...Logged out remote users\n"))
 		})
 
-
 	})
 
 	Describe("Execute setup script messages", func() {

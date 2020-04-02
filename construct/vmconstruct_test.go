@@ -26,6 +26,7 @@ var _ = Describe("construct_helpers", func() {
 		fakeVersionGetter         *constructfakes.FakeVersionGetter
 		fakeVMConnectionValidator *constructfakes.FakeVMConnectionValidator
 	)
+	const encodedCommand = "JAAoAEcAZQB0AC0AVwBtAGkATwBiAGoAZQBjAHQAIAB3AGkAbgAzADIAXwBvAHAAZQByAGEAdABpAG4AZwBzAHkAcwB0AGUAbQApAC4AVwBpAG4AMwAyAFMAaAB1AHQAZABvAHcAbgAoADAAKQA="
 
 	BeforeEach(func() {
 		fakeRemoteManager = &remotemanagerfakes.FakeRemoteManager{}
@@ -210,8 +211,8 @@ var _ = Describe("construct_helpers", func() {
 		})
 
 		Describe("logs out users", func() {
-			It("returns success when all users are logged out", func(){
-			fakeVcenterClient.StartReturnsOnCall(0, "5555", nil)
+			It("returns success when active user is logged out", func() {
+				fakeVcenterClient.StartReturnsOnCall(0, "5555", nil)
 
 				err := vmConstruct.PrepareVM()
 				Expect(err).ToNot(HaveOccurred())
@@ -221,7 +222,7 @@ var _ = Describe("construct_helpers", func() {
 				Expect(command).To(Equal("C:\\Windows\\System32\\WindowsPowerShell\\V1.0\\powershell.exe"))
 				Expect(vmPath).To(Equal("fakeVmPath"))
 				// maybe use contains instead of equal
-				Expect(args).To(Equal([]string{"-EncodedCommand"}))
+				Expect(args).To(Equal([]string{"-EncodedCommand", encodedCommand}))
 				Expect(user).To(Equal("fakeUser"))
 				Expect(pass).To(Equal("fakePass"))
 				Expect(fakeVcenterClient.StartCallCount()).To(Equal(1))
@@ -235,7 +236,7 @@ var _ = Describe("construct_helpers", func() {
 				Expect(fakeMessenger.LogOutUsersStartedCallCount()).To(Equal(1))
 				Expect(fakeMessenger.LogOutUsersSucceededCallCount()).To(Equal(1))
 			})
-			It("returns failure when it does not log all users out because cannot perform Start command", func(){
+			It("returns failure when it does not log out active user because cannot perform Start command", func() {
 				logoutError := errors.New("start command failure")
 				fakeVcenterClient.StartReturns("", logoutError)
 
@@ -248,7 +249,7 @@ var _ = Describe("construct_helpers", func() {
 				Expect(fakeMessenger.LogOutUsersStartedCallCount()).To(Equal(1))
 				Expect(fakeMessenger.LogOutUsersSucceededCallCount()).To(Equal(0))
 			})
-			It("returns failure when it does not log all users out because cannot get exit code", func(){
+			It("returns failure when it does not log out active user because cannot get exit code", func() {
 				logoutError := errors.New("wait for exit error")
 				fakeVcenterClient.WaitForExitReturns(0, logoutError)
 
@@ -261,14 +262,14 @@ var _ = Describe("construct_helpers", func() {
 				Expect(fakeMessenger.LogOutUsersStartedCallCount()).To(Equal(1))
 				Expect(fakeMessenger.LogOutUsersSucceededCallCount()).To(Equal(0))
 			})
-			It("returns failure when it does not log all users out because non-zero exit code", func(){
+			It("returns failure when it does not log out active user because non-zero exit code", func() {
 				fakeVcenterClient.WaitForExitReturns(1, nil)
 
 				err := vmConstruct.PrepareVM()
 				Expect(err).To(HaveOccurred())
 
 				Expect(fakeVcenterClient.WaitForExitCallCount()).To(Equal(1))
-				Expect(err.Error()).To(Equal("failed to log out remote user: " + "WinRM process on guest VM exited with code 1"))
+				Expect(err.Error()).To(Equal("failed to log out remote user: " + "logout process on VM exited with code 1"))
 
 				Expect(fakeMessenger.LogOutUsersStartedCallCount()).To(Equal(1))
 				Expect(fakeMessenger.LogOutUsersSucceededCallCount()).To(Equal(0))
