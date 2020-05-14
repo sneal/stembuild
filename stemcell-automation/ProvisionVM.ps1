@@ -13,7 +13,6 @@ function ProvisionVM() {
     Install-SecurityPoliciesAndRegistries
     Enable-SSHD
     InstallCFFeatures
-    Enable-HyperV
     try
     {
         Install-WUCerts
