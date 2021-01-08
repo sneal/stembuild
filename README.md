@@ -211,7 +211,6 @@ cd $HOME/go/src/github.com/cloudfoundry-incubator
 git clone https://github.com/cloudfoundry-incubator/stembuild.git
 ```
 - Download the latest released artifact in [Stemcell Automation Github Repo](https://github.com/cloudfoundry-incubator/bosh-windows-stemcell-automation/releases)
-- Install the [greenhouse-dotfiles](https://github.com/pivotal-cf/greenhouse-dotfiles#greenhouse-dotfiles). Ensure your `./bash_profile` is pointing to the `bash_profile` file downloaded from greenhouse by running `ls -al $HOME`. Repoint it if necessary and then install again.
 - Manually download the `ginkgo` and `go-bindata` libraries
 ```
 go get -u github.com/jteeuwen/go-bindata/...
