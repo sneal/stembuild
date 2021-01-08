@@ -32,6 +32,10 @@ all : test build
 
 build : out/stembuild
 
+build-windows : out/stembuild.exe
+
+build-linux : out/stembuild-linux
+
 build-integration : generate-fake-stemcell-automation $(GOSRC)
 	go build -o $(COMMAND) -ldflags $(LD_FLAGS) .
 
@@ -60,7 +64,10 @@ out/stembuild : generate $(GOSRC)
 	go build -o $(COMMAND) -ldflags $(LD_FLAGS) .
 
 out/stembuild.exe : generate $(GOSRC)
-	GOOS=windows go build -o out/stembuild.exe -ldflags $(LD_FLAGS) .
+	GOOS=windows GOARCH=amd64 go build -o out/stembuild.exe -ldflags $(LD_FLAGS) .
+
+out/stembuild-linux : generate $(GOSRC)
+	GOOS=linux GOARCH=amd64 go build -o out/stembuild -ldflags $(LD_FLAGS) .
 
 test : units
 
