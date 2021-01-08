@@ -177,30 +177,6 @@ cd stemcell-automation
 invoke-pester
 ```
 
-## Vendoring
-
-Vendoring for this project is done using `dep`. 
-To sync all the dependecies run
-```
-dep ensure
-```
-
-To add a new dependency run 
-```
-dep ensure -add <git package url>
-```
-like 
-```
-dep ensure -add github.com/google/subcommands
-```
-
-To check if dependencies are in sync or not run
-```
-dep sync
-```
-The output should be nothing if there no out-of-sync dependencies.
-
-
 ## Compile stembuild for MacOS
 
 You can use stembuild on MacOS, but following the below steps. 
