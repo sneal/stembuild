@@ -205,10 +205,12 @@ The output should be nothing if there no out-of-sync dependencies.
 
 You can use stembuild on MacOS, but following the below steps. 
 
-- Download or clone the stembuild repository locally on your MacOS inside your `go` directory 
+- Download or clone the stembuild and bosh-agent repositories locally on your MacOS inside your `go` directory 
 ```
 cd $HOME/go/src/github.com/cloudfoundry-incubator
 git clone https://github.com/cloudfoundry-incubator/stembuild.git
+cd $HOME/go/src/github.com/cloudfoundry
+git clone https://github.com/cloudfoundry/bosh-agent.git
 ```
 - Download the latest released artifact in [Stemcell Automation Github Repo](https://github.com/cloudfoundry-incubator/bosh-windows-stemcell-automation/releases)
 - Manually download the `ginkgo` and `go-bindata` libraries
