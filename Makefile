@@ -18,8 +18,14 @@ ifeq ($(OS),Windows_NT)
 	COMMAND = out/stembuild.exe
 	CP = cp
 else
-	COMMAND = out/stembuild
-	CP = cp --preserve=mode,ownership
+	UNAME := $(shell uname -s)
+	ifeq ($(UNAME), Darwin)
+		COMMAND = out/stembuild
+		CP = cp -p
+	else
+		COMMAND = out/stembuild
+		CP = cp --preserve=mode,ownership
+	endif
 endif
 
 all : test build
